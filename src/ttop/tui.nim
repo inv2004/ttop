@@ -3,6 +3,8 @@ import os
 import procfs
 import strutils
 import strformat
+import tables
+import times
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
@@ -14,15 +16,29 @@ const offset = 2
 # proc header*(tb TerminalBuffer) =
 proc header(tb: var TerminalBuffer) =
 
-  tb.write(offset, 1, fgWhite, "Press any key to display its name")
-  tb.write(offset, 2, "Press ", fgYellow, "ESC", fgWhite,
+  let sys = sysInfo()
+
+  tb.write(offset, 1, fgWhite, "RTC: ", $sys.datetime)
+  tb.write(offset, 2, fgWhite)
+  tb.write "CPU: ", sys.cpu.formatF().cut(4, false, 0), "  %|"
+  for i, cpu in sys.cpus:
+    if i == 0:
+      tb.write " "
+    tb.write cpu.formatF().cut(4, true, 0)
+  tb.write "  |%"
+  tb.write(offset, 3, "Press ", fgYellow, "ESC", fgWhite,
                " or ", fgYellow, "Q", fgWhite, " to quit")
   # tb.drawHorizLine(offset, tb.width - offset - 1, 3, doubleStyle=false)
-  tb.write(offset, 3, bgMagenta, fmt"""{"PID":>5} {"USER":<11} {"S":1} {"VIRT":>10} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"UP":>8}""", ' '.repeat(tb.width-66), bgNone)
 
 proc table(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
   var y = 4
-  for p in pidsInfo(curSort)[scrollY..^1]:
+
+  tb.write(offset, y, bgMagenta, fmt"""{"PID":>5} {"USER":<11} {"S":1} {"VIRT":>10} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"UP":>8}""", ' '.repeat(tb.width-66), bgNone)
+  inc y
+
+  for (i, p) in pidsInfo(curSort).pairs:
+    if (y-4) < scrollY:
+      continue
     tb.setCursorPos offset, y
     tb.write p.pid.cut(5, true, scrollX), " "
     if p.user == "":
@@ -32,10 +48,10 @@ proc table(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
     tb.write p.state, fgWhite, " "
     tb.write p.vsize.formatU().cut(10, true, scrollX), fgWhite, " "
     tb.write p.rss.formatU().cut(10, true, scrollX), fgWhite, " "
-    tb.write p.cpu.formatF().cut(5, true, scrollX), fgWhite, " "
     tb.write p.mem.formatF().cut(5, true, scrollX), fgWhite, " "
+    tb.write p.cpu.formatF().cut(5, true, scrollX), fgWhite, " "
     tb.write p.uptime.formatT().cut(8, false, scrollX)
-    tb.write fgCyan, p.cmd.cut(tb.width - 67, false, scrollX), fgWhite
+    tb.write fgCyan, p.cmd.cut(tb.width - 68, false, scrollX), fgWhite
 
     inc y
     if y > tb.height-2:
@@ -66,7 +82,7 @@ proc run*() =
   while true:
     var key = getKey()
     if key != Key.None:
-      tb.write(30, 2, resetStyle, "Key pressed: ", fgGreen, $key)
+      tb.write(60, 1, resetStyle, "Key pressed: ", fgGreen, $key)
     tb.write(30, 2, resetStyle)
     case key
     of Key.Escape, Key.Q: exitProc()
@@ -90,7 +106,8 @@ proc run*() =
     if refresh == 20:
       table(tb, curSort, scrollX, scrollY)
       refresh = 0
-    inc refresh
+    else:
+      inc refresh
 
     tb.display()
     sleep(100)

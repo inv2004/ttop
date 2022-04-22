@@ -1,9 +1,10 @@
 import os
 import strutils
 import posix_utils, posix
-import algorithm
 import times
 import strformat
+import tables
+import sequtils
 
 const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
@@ -26,10 +27,27 @@ type PidInfo = object
   state*: string
   vsize*: uint
   rss*: uint
+  cpuTime*: int
   cpu*: float
   mem*: float
   cmd*: string
+  uptimeHz*: int
   uptime*: int
+
+type SysInfo = object
+  datetime*: times.DateTime
+  cpu*: float
+  cpus*: seq[float]
+
+proc pidsInfo*(sortOrder = Rss): OrderedTable[uint, PidInfo]
+let hz = sysconf(SC_CLK_TCK)
+var prev = pidsInfo()
+sleep hz
+
+proc sysInfo*(): SysInfo
+echo sysInfo()
+
+# quit 1
 
 proc formatT*(ts: int): string =
   let d = initDuration(seconds = ts)
@@ -69,7 +87,7 @@ proc cut*(str: string, size: int, right: bool, scroll: int): string =
     if max >= str.high:
       str[^size..max] & ' '
     else:
-      str[scroll..<max] & "."
+        str[scroll..<max] & "."
   else:
     if right:
       ' '.repeat(size - l) & str
@@ -79,9 +97,9 @@ proc cut*(str: string, size: int, right: bool, scroll: int): string =
 proc cut*(i: int | uint, size: int, right: bool, scroll: int): string =
   cut($i, size, right, scroll)
 
-proc parseUptime(file: string): int =
-  let line = readLines(file, 1)[0]
-  int line.split()[0].parseFloat()
+proc parseUptime(): int =
+  let line = readLines(PROCFS & "/uptime", 1)[0]
+  int float(hz) * line.split()[0].parseFloat()
 
 proc parseSize(str: string): int =
   let normStr = str.strip(true, false)
@@ -90,8 +108,8 @@ proc parseSize(str: string): int =
   else:
     parseInt(normStr)
 
-proc parseMemInfo(file: string): MemInfo =
-  for line in lines(file):
+proc parseMemInfo(): MemInfo =
+  for line in lines(PROCFS & "/meminfo"):
     let parts = line.split(":", 1)
     case parts[0]
     of "MemTotal": result.MemTotal = parseSize(parts[1])
@@ -100,7 +118,8 @@ proc parseMemInfo(file: string): MemInfo =
     of "Buffers": result.Buffers = parseSize(parts[1])
     of "Cached": result.Cached = parseSize(parts[1])
 
-proc parseStat(file: string, uptime: int, hz: int, mem: MemInfo, pageSize: uint): PidInfo =
+proc parseStat(pid: uint, uptime: int, mem: MemInfo, pageSize: uint): PidInfo =
+  let file = PROCFS & "/" & $pid & "/stat"
   let stat = stat(file)
   result.uid = stat.st_uid
   let userInfo = getpwuid(result.uid)
@@ -113,13 +132,17 @@ proc parseStat(file: string, uptime: int, hz: int, mem: MemInfo, pageSize: uint)
   result.state = parts[2]
   result.vsize = parts[22].parseUInt()
   result.rss = pageSize * parts[23].parseUInt()
-  result.uptime = uptime - parts[21].parseInt() div hz
-  let totalTime = (parts[13].parseInt() + parts[14].parseInt()) div hz
-  result.cpu = 100 * total_time / result.uptime
+  result.uptimeHz = uptime - parts[21].parseInt()
+  # result.uptimeHz = parts[21].parseInt()
+  result.uptime = result.uptimeHz div hz
+  result.cpuTime = parts[13].parseInt() + parts[14].parseInt()
+  let prevCpuTime = prev.getOrDefault(pid).cpuTime
+  let prevUptimeHz = prev.getOrDefault(pid).uptimeHz
+  result.cpu = 100 * (result.cpuTime - prevCpuTime) / (result.uptimeHz - prevUptimeHz)
   result.mem = float(100 * result.rss) / float(mem.MemTotal)
 
-proc parsePid(pid: uint, uptime: int, hz: int, mem: MemInfo, pageSize: uint): PidInfo =
-  result = parseStat(PROCFS & "/" & $pid & "/stat", uptime, hz, mem, pageSize)
+proc parsePid(pid: uint, uptime: int, mem: MemInfo, pageSize: uint): PidInfo =
+  result = parseStat(pid, uptime, mem, pageSize)
   result.cmd = readLines(PROCFS & "/" & $pid & "/cmdline", 1)[0].replace('\0', ' ').strip(false, true, {'\0'})
 
 proc pids*(): seq[uint] =
@@ -131,23 +154,44 @@ proc pids*(): seq[uint] =
       except:
         discard
 
-proc sortFunc(sort: SortField): auto =
-  case sort
-  of Pid: return proc(a, b: PidInfo): int =
-            cmp a.pid, b.pid
-  of Name: return proc(a, b: PidInfo): int =
-            cmp a.name, b.name
-  of Rss: return proc(a, b: PidInfo): int =
-            cmp b.rss, a.rss
-  of Cpu: return proc(a, b: PidInfo): int =
-            cmp b.cpu, a.cpu
+proc sortFunc(sortOrder: SortField): auto =
+  case sortOrder
+  of Pid: return proc(a, b: (uint, PidInfo)): int =
+                    cmp a[1].pid, b[1].pid
+  of Name: return proc(a, b: (uint, PidInfo)): int =
+                    cmp a[1].name, b[1].name
+  of Rss: return proc(a, b: (uint, PidInfo)): int =
+                    cmp b[1].rss, a[1].rss
+  of Cpu: return proc(a, b: (uint, PidInfo)): int =
+                    cmp b[1].cpu, a[1].cpu
 
-proc pidsInfo*(sort = Rss): seq[PidInfo] =
-  let hz = sysconf(SC_CLK_TCK)
+proc pidsInfo*(sortOrder = Rss): OrderedTable[uint, PidInfo] =
   let pageSize = uint sysconf(SC_PAGESIZE)
-  let memInfo = parseMemInfo(PROCFS & "/meminfo")
-  let uptime = parseUptime(PROCFS & "/uptime")
+  let memInfo = parseMemInfo()
+  let uptime = parseUptime()
   for pid in pids():
-    result.add parsePid(pid, uptime, hz, memInfo, pageSize)
+    result[pid] = parsePid(pid, uptime, memInfo, pageSize)
 
-  result.sort sortFunc(sort)
+  if sortOrder != Pid:
+    sort(result, sortFunc(sortOrder))
+  prev = result
+
+proc parseStat(): (float, seq[float]) =
+  for line in lines(PROCFS & "/stat"):
+    if line.startsWith("cpu"):
+      let parts = line.split()
+      var off = 1
+      if parts[1] == "":
+        off = 2
+      let all = parts[off..<off+8].map(parseInt)
+      let total = all.foldl(a+b)
+      let idle = all[3] + all[4]
+      let cpu = 100 * (total - idle) / total
+      if off == 1:
+        result[1].add cpu
+      else:
+        result[0] = cpu
+
+proc sysInfo*(): SysInfo =
+  result.datetime = times.now()
+  (result.cpu, result.cpus) = parseStat()

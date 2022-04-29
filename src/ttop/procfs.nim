@@ -19,6 +19,8 @@ type MemInfo* = object
   MemAvailable*: uint
   Buffers*: uint
   Cached*: uint
+  SwapTotal*: uint
+  SwapFree*: uint
 
 type PidInfo* = object
   pid*: uint
@@ -85,7 +87,7 @@ proc formatU*(b: uint): string =
       matchedIndex = index - 1
       break
   fbytes = bytes.float / (1'i64 shl (matchedIndex*10)).float
-  result = formatFloat(fbytes, format = ffDecimal, precision = 2, decimalSep = ',')
+  result = formatFloat(fbytes, format = ffDecimal, precision = 2, decimalSep = '.')
   result.trimZeros(',')
   result &= " "
   result &= prefixes[matchedIndex]
@@ -108,7 +110,7 @@ proc formatUU*(b: uint): string =
       matchedIndex = index - 1
       break
   fbytes = bytes.float / (1'i64 shl (matchedIndex*10)).float
-  result = formatFloat(fbytes, format = ffDecimal, precision = 2, decimalSep = ',')
+  result = formatFloat(fbytes, format = ffDecimal, precision = 2, decimalSep = '.')
   result.trimZeros(',')
 
 proc cut*(str: string, size: int, right: bool, scroll: int): string =
@@ -148,6 +150,8 @@ proc memInfo(): MemInfo =
     of "MemAvailable": result.MemAvailable = parseSize(parts[1])
     of "Buffers": result.Buffers = parseSize(parts[1])
     of "Cached": result.Cached = parseSize(parts[1])
+    of "SwapTotal": result.SwapTotal = parseSize(parts[1])
+    of "SwapFree": result.SwapFree = parseSize(parts[1])
   result.MemDiff = int(result.MemFree) - int(prevMem.MemFree)
 
 proc parseStat(pid: uint, uptime: int, mem: MemInfo, pageSize: uint): PidInfo =

@@ -5,6 +5,7 @@ import strutils
 import strformat
 import tables
 import times
+import limits
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
@@ -13,7 +14,6 @@ proc exitProc() {.noconv.} =
 
 const offset = 2
 
-# proc header*(tb TerminalBuffer) =
 proc header(tb: var TerminalBuffer, info: FullInfo) =
   let si = info.sys
   let mi = info.mem
@@ -24,16 +24,23 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
   for i, cpu in si.cpus:
     if i > 0:
       tb.write "|"
-    if cpu.cpu >= 10:
+    if cpu.cpu >= cpuCoreLimit:
       tb.write fgRed
-    tb.write cpu.cpu.formatF().cut(4, true, 0)
-    if cpu.cpu >= 10:
-      tb.write fgNone
+    tb.write cpu.cpu.formatF().cut(4, true, 0), fgNone
   tb.write " |%"
   tb.setCursorPos(offset, 3)
-  let memStr = fmt"{formatUU(mi.MemTotal - mi.MemFree)} / {mi.MemTotal.formatU()}".cut(20, false, 0)
+  let memStr = fmt"{formatUU(mi.MemTotal - mi.MemFree)} / {mi.MemTotal.formatU()}"
   let sign = if mi.MemDiff > 0: '+' elif mi.MemDiff == 0: '=' else: '-'
-  tb.write fmt"MEM: {memStr} DIFF: {sign}{uint(abs(mi.MemDiff)).formatU().cut(10, false, 0)} BUF: {mi.Buffers.formatU().cut(10, false, 0)} CACHE: {mi.Cached.formatU().cut(10, false, 0)}"
+  let memChk = 100 * float(mi.MemTotal - mi.MemFree) / float(mi.MemTotal)
+  if memChk >= memLimit:
+    tb.write fgRed
+  tb.write fmt"MEM: {memStr:16} ", fgWhite
+  tb.write fmt"DIFF: {sign}{uint(abs(mi.MemDiff)).formatU():10} BUF: {mi.Buffers.formatU():10} CACHE: {mi.Cached.formatU():10}  ", fgWhite
+  let swpStr = fmt"{formatUU(mi.SwapTotal - mi.SwapFree)} / {mi.SwapTotal.formatU()}"
+  let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
+  if swpChk >= swpLimit:
+    tb.write fgRed
+  tb.write fmt"SWP: {swpStr:16}"
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
   tb.setCursorPos offset, tb.height - 1
@@ -49,14 +56,16 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
   if scrollY > 0:
     tb.write fmt" Y: {scrollY} "
   else:
-    tb.write "-".repeat(20)
+    tb.setForegroundColor(fgBlack, true)
+    let (x, y) = tb.getCursorPos()
+    tb.drawHorizLine(x, x+10, y)
 
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo], curSort: SortField, scrollX, scrollY: int) =
   var y = 5
   tb.write(offset, y, bgBlue, fmt"""{"PID":>5} {"USER":<11} {"S":1} {"VIRT":>10} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"UP":>8}""", ' '.repeat(tb.width-66), bgNone)
   inc y
   for (i, p) in pi.pairs:
-    if (y-4) < scrollY:
+    if i < uint scrollY:
       continue
     tb.setCursorPos offset, y
     tb.write p.pid.cut(5, true, scrollX), " "
@@ -66,13 +75,13 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo], curSort: Sor
       tb.write fgYellow, p.user.cut(10, false, scrollX), fgWhite, " "
     tb.write p.state, fgWhite, " "
     tb.write p.vsize.formatU().cut(10, true, scrollX), fgWhite, " "
-    if p.mem >= 10:
+    if p.mem >= rssLimit:
       tb.write fgRed
     tb.write p.rss.formatU().cut(10, true, scrollX), fgWhite, " "
-    if p.mem >= 10:
+    if p.mem >= rssLimit:
       tb.write fgRed
     tb.write p.mem.formatF().cut(5, true, scrollX), fgWhite, " "
-    if p.cpu >= 20:
+    if p.cpu >= cpuLimit:
       tb.write fgRed
     tb.write p.cpu.formatF().cut(5, true, scrollX), fgWhite, " "
     tb.write p.uptime.formatT().cut(8, false, scrollX)

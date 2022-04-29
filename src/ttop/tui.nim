@@ -34,13 +34,22 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
   let memChk = 100 * float(mi.MemTotal - mi.MemFree) / float(mi.MemTotal)
   if memChk >= memLimit:
     tb.write fgRed
-  tb.write fmt"MEM: {memStr:16} ", fgWhite
+  tb.write fmt"MEM: {memStr:16}   ", fgWhite
   tb.write fmt"DIFF: {sign}{uint(abs(mi.MemDiff)).formatU():10} BUF: {mi.Buffers.formatU():10} CACHE: {mi.Cached.formatU():10}  ", fgWhite
   let swpStr = fmt"{formatUU(mi.SwapTotal - mi.SwapFree)} / {mi.SwapTotal.formatU()}"
   let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
   if swpChk >= swpLimit:
     tb.write fgRed
   tb.write fmt"SWP: {swpStr:16}"
+  tb.setCursorPos(offset, 4)
+  tb.write fmt"DSK: "
+  var i = 0
+  for name, disk in info.disk:
+    let used = disk.total - disk.avail
+    if i > 0:
+      tb.write " | "
+    tb.write fmt"{name} {used.formatUU()} / {disk.total.formatU()}"
+    inc i
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
   tb.setCursorPos offset, tb.height - 1
@@ -61,7 +70,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
     tb.drawHorizLine(x, x+10, y)
 
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo], curSort: SortField, scrollX, scrollY: int) =
-  var y = 5
+  var y = 6
   tb.write(offset, y, bgBlue, fmt"""{"PID":>5} {"USER":<11} {"S":1} {"VIRT":>10} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"UP":>8}""", ' '.repeat(tb.width-66), bgNone)
   inc y
   for (i, p) in pi.pairs:

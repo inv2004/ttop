@@ -1,6 +1,9 @@
+import sys
+
 import os
 import strutils
-import posix_utils, posix
+from posix import Uid, getpwuid
+import posix_utils
 import times
 import strformat
 import tables
@@ -47,19 +50,23 @@ type SysInfo* = object
   cpu*: CpuInfo
   cpus*: seq[CpuInfo]
 
+type Disk = object
+  avail*: uint
+  total*: uint
+  io*: uint
+  ioUsage*: float
+
 type FullInfo* = object
   sys*: SysInfo
   mem*: MemInfo
   pidsInfo*: OrderedTable[uint, procfs.PidInfo]
+  disk*: OrderedTable[string, Disk]
 
-proc memInfo(): MemInfo
-proc pidsInfo*(sortOrder: SortField, memInfo: MemInfo): OrderedTable[uint, PidInfo]
-proc sysInfo*(): SysInfo
+const MOUNT = "/proc/mounts"
+const DISKSTATS = "/proc/diskstats"
 
-let hz = sysconf(SC_CLK_TCK)
-var prevMem = memInfo()
-var prevPids = pidsInfo(Pid, prevMem)
-var prevSys = sysInfo()
+proc fullInfo*(sortOrder = Pid): FullInfo
+var prevInfo = fullInfo()
 sleep hz
 
 proc formatT*(ts: int): string =
@@ -152,9 +159,9 @@ proc memInfo(): MemInfo =
     of "Cached": result.Cached = parseSize(parts[1])
     of "SwapTotal": result.SwapTotal = parseSize(parts[1])
     of "SwapFree": result.SwapFree = parseSize(parts[1])
-  result.MemDiff = int(result.MemFree) - int(prevMem.MemFree)
+  result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
-proc parseStat(pid: uint, uptime: int, mem: MemInfo, pageSize: uint): PidInfo =
+proc parseStat(pid: uint, uptime: int, mem: MemInfo): PidInfo =
   let file = PROCFS & "/" & $pid & "/stat"
   let stat = stat(file)
   result.uid = stat.st_uid
@@ -172,13 +179,13 @@ proc parseStat(pid: uint, uptime: int, mem: MemInfo, pageSize: uint): PidInfo =
   # result.uptimeHz = parts[21].parseInt()
   result.uptime = result.uptimeHz div hz
   result.cpuTime = parts[13].parseInt() + parts[14].parseInt()
-  let prevCpuTime = prevPids.getOrDefault(pid).cpuTime
-  let prevUptimeHz = prevPids.getOrDefault(pid).uptimeHz
+  let prevCpuTime = prevInfo.pidsInfo.getOrDefault(pid).cpuTime
+  let prevUptimeHz = prevInfo.pidsInfo.getOrDefault(pid).uptimeHz
   result.cpu = 100 * (result.cpuTime - prevCpuTime) / (result.uptimeHz - prevUptimeHz)
   result.mem = float(100 * result.rss) / float(mem.MemTotal)
 
-proc parsePid(pid: uint, uptime: int, mem: MemInfo, pageSize: uint): PidInfo =
-  result = parseStat(pid, uptime, mem, pageSize)
+proc parsePid(pid: uint, uptime: int, mem: MemInfo): PidInfo =
+  result = parseStat(pid, uptime, mem)
   result.cmd = readLines(PROCFS & "/" & $pid & "/cmdline", 1)[0].replace('\0', ' ').strip(false, true, {'\0'})
 
 proc pids*(): seq[uint] =
@@ -202,18 +209,16 @@ proc sortFunc(sortOrder: SortField): auto =
                     cmp b[1].cpu, a[1].cpu
 
 proc pidsInfo*(sortOrder: SortField, memInfo: MemInfo): OrderedTable[uint, PidInfo] =
-  let pageSize = uint sysconf(SC_PAGESIZE)
   let uptime = parseUptime()
   for pid in pids():
     try:
-      result[pid] = parsePid(pid, uptime, memInfo, pageSize)
+      result[pid] = parsePid(pid, uptime, memInfo)
     except OSError:
       if osLastError() != OSErrorCode(2):
         raise
 
   if sortOrder != Pid:
     sort(result, sortFunc(sortOrder))
-  prevPids = result
 
 proc getOrDefault(s: seq[CpuInfo], i: int): CpuInfo =
   if i < s.len:
@@ -230,13 +235,13 @@ proc parseStat(): (CpuInfo, seq[CpuInfo]) =
       let total = all.foldl(a+b)
       let idle = all[3] + all[4]
       if off == 1:
-        let curTotal = total - prevSys.cpus.getOrDefault(result[1].len).total
-        let curIdle = idle - prevSys.cpus.getOrDefault(result[1].len).idle
+        let curTotal = total - prevInfo.sys.cpus.getOrDefault(result[1].len).total
+        let curIdle = idle - prevInfo.sys.cpus.getOrDefault(result[1].len).idle
         let cpu = 100 * (curTotal - curIdle) / curTotal
         result[1].add CpuInfo(total: total, idle: idle, cpu: cpu)
       else:
-        let curTotal = total - prevSys.cpu.total
-        let curIdle = idle - prevSys.cpu.idle
+        let curTotal = total - prevInfo.sys.cpu.total
+        let curIdle = idle - prevInfo.sys.cpu.idle
         let cpu = 100 * (curTotal - curIdle) / curTotal
         result[0] = CpuInfo(total: total, idle: idle, cpu: cpu)
 
@@ -244,7 +249,31 @@ proc sysInfo*(): SysInfo =
   result.datetime = times.now()
   (result.cpu, result.cpus) = parseStat()
 
-proc fullInfo*(sortOrder = Rss): FullInfo =
+proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
+  for line in lines(MOUNT):
+    if line.startsWith("/dev/"):
+      let parts = line.split(maxsplit = 2)
+      let name = parts[0][5..^1]
+      var stat: Statvfs
+      assert 0 == statvfs(cstring parts[1], stat)
+      result[name] = Disk(avail: stat.f_bfree * stat.f_bsize, total: stat.f_blocks * stat.f_bsize)
+  for line in lines(DISKSTATS):
+    let parts = line.splitWhitespace()
+    let name = parts[2]
+    if name in result:
+      let io = parseUInt parts[12]
+      echo "DDD1: ", prevInfo.disk
+      result[name].io = io
+      echo "DDD2: ", prevInfo.disk
+      let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
+      echo name, " ", prevInfo.disk[name].io
+      result[name].ioUsage = 100 * float(io - prevInfo.disk[name].io) / float msPassed
+
+proc fullInfo*(sortOrder = Pid): FullInfo =
   result.sys = sysInfo()
   result.mem = memInfo()
   result.pidsInfo = pidsInfo(sortOrder, result.mem)
+  result.disk = diskInfo(result.sys.datetime)
+  # prevInfo = result
+
+quit 1

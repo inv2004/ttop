@@ -71,7 +71,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
 
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo], curSort: SortField, scrollX, scrollY: int) =
   var y = 6
-  tb.write(offset, y, bgBlue, fmt"""{"PID":>5} {"USER":<11} {"S":1} {"VIRT":>10} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"UP":>8}""", ' '.repeat(tb.width-66), bgNone)
+  tb.write(offset, y, bgBlue, fmt"""{"PID":>5} {"USER":<11} {"S":1} {"VIRT":>10} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"IO":>15} {"UP":>8}""", ' '.repeat(tb.width-66), bgNone)
   inc y
   for (i, p) in pi.pairs:
     if i < uint scrollY:
@@ -93,6 +93,11 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo], curSort: Sor
     if p.cpu >= cpuLimit:
       tb.write fgRed
     tb.write p.cpu.formatF().cut(5, true, scrollX), fgWhite, " "
+    var rwStr = ""
+    if p.ioReadDiff + p.ioWriteDiff > 0:
+      rwStr = fmt"{p.ioReadDiff.formatUU()}/{p.ioWriteDiff.formatU()}"
+    tb.write rwStr.cut(15, true, scrollX), " "
+
     tb.write p.uptime.formatT().cut(8, false, scrollX)
     tb.write fgCyan, p.cmd.cut(tb.width - 68, false, scrollX), fgWhite
 
@@ -143,6 +148,7 @@ proc run*() =
     of Key.Down: inc scrollY; redraw(tb, curSort, scrollX, scrollY)
     of Key.P: curSort = Pid; redraw(tb, curSort, scrollX, scrollY)
     of Key.R: curSort = Rss; redraw(tb, curSort, scrollX, scrollY)
+    of Key.I: curSort = Io; redraw(tb, curSort, scrollX, scrollY)
     of Key.N: curSort = Name; redraw(tb, curSort, scrollX, scrollY)
     of Key.C: curSort = Cpu; redraw(tb, curSort, scrollX, scrollY)
     else: discard

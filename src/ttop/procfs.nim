@@ -13,7 +13,7 @@ const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
 
 type SortField* = enum
-  Cpu, Rss, Pid, Name
+  Cpu, Rss, Io, Pid, Name
 
 type MemInfo* = object
   MemTotal*: uint
@@ -39,6 +39,8 @@ type PidInfo* = object
   cmd*: string
   uptimeHz*: int
   uptime*: int
+  ioRead*, ioWrite*: uint
+  ioReadDiff*, ioWriteDiff*: uint
 
 type CpuInfo = object
   total*: int
@@ -188,8 +190,28 @@ proc parseStat(pid: uint, uptime: int, mem: MemInfo): PidInfo =
   result.cpu = 100 * (result.cpuTime - prevCpuTime) / (result.uptimeHz - prevUptimeHz)
   result.mem = float(100 * result.rss) / float(mem.MemTotal)
 
+proc parseIO(pid: uint): (uint, uint, uint, uint) =
+  let file = PROCFS & "/" & $pid & "/io"
+  for line in lines(file):
+    let parts = line.split(":", 1)
+    case parts[0]
+    of "rchar":
+      result[0] = parseUInt parts[1].strip()
+      result[2] = result[0] - prevInfo.pidsInfo.getOrDefault(pid).ioRead
+    of "wchar":
+      result[1] = parseUInt parts[1].strip()
+      result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).ioWrite
+
 proc parsePid(pid: uint, uptime: int, mem: MemInfo): PidInfo =
   result = parseStat(pid, uptime, mem)
+  try:
+    let io = parseIO(pid)
+    result.ioRead = io[0]
+    result.ioReadDiff = io[2]
+    result.ioWrite = io[1]
+    result.ioWriteDiff = io[3]
+  except IOError:
+    discard
   result.cmd = readLines(PROCFS & "/" & $pid & "/cmdline", 1)[0].replace('\0', ' ').strip(false, true, {'\0'})
 
 proc pids*(): seq[uint] =
@@ -209,6 +231,8 @@ proc sortFunc(sortOrder: SortField): auto =
                     cmp a[1].name, b[1].name
   of Rss: return proc(a, b: (uint, PidInfo)): int =
                     cmp b[1].rss, a[1].rss
+  of Io: return proc(a, b: (uint, PidInfo)): int =
+                    cmp b[1].ioReadDiff+b[1].ioWriteDiff, a[1].ioReadDiff+a[1].ioWriteDiff
   of Cpu: return proc(a, b: (uint, PidInfo)): int =
                     cmp b[1].cpu, a[1].cpu
 

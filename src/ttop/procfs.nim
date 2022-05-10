@@ -250,6 +250,7 @@ proc sysInfo*(): SysInfo =
   (result.cpu, result.cpus) = parseStat()
 
 proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
+  var result = initOrderedTable[string, Disk]()
   for line in lines(MOUNT):
     if line.startsWith("/dev/"):
       let parts = line.split(maxsplit = 2)
@@ -262,18 +263,14 @@ proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
     let name = parts[2]
     if name in result:
       let io = parseUInt parts[12]
-      echo "DDD1: ", prevInfo.disk, " ", io
       result[name].io = io
-      echo "DDD2: ", prevInfo.disk
       let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
-      echo name, " ", prevInfo.disk[name].io
-      result[name].ioUsage = 100 * float(io - prevInfo.disk[name].io) / float msPassed
+      result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(name).io) / float msPassed
+  return result
 
 proc fullInfo*(sortOrder = Pid): FullInfo =
   result.sys = sysInfo()
   result.mem = memInfo()
   result.pidsInfo = pidsInfo(sortOrder, result.mem)
   result.disk = diskInfo(result.sys.datetime)
-  # prevInfo = result.deepCopy()
-
-quit 1
+  prevInfo = result

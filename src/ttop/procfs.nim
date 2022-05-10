@@ -54,7 +54,11 @@ type Disk = object
   avail*: uint
   total*: uint
   io*: uint
+  ioRead*: uint
+  ioWrite*: uint
   ioUsage*: float
+  ioUsageRead*: float
+  ioUsageWrite*: float
 
 type FullInfo* = object
   sys*: SysInfo
@@ -262,10 +266,16 @@ proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
     let parts = line.splitWhitespace()
     let name = parts[2]
     if name in result:
+      let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
       let io = parseUInt parts[12]
       result[name].io = io
-      let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
       result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(name).io) / float msPassed
+      let ioRead = parseUInt parts[6]
+      result[name].ioRead = ioRead
+      result[name].ioUsageRead = 100 * float(ioRead - prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
+      let ioWrite = parseUInt parts[10]
+      result[name].ioWrite = ioWrite
+      result[name].ioUsageWrite = 100 * float(ioWrite - prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
   return result
 
 proc fullInfo*(sortOrder = Pid): FullInfo =

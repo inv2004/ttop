@@ -48,7 +48,7 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
     let used = disk.total - disk.avail
     if i > 0:
       tb.write " | "
-    tb.write fmt"{name} {used.formatUU()} / {disk.total.formatU()} (io {disk.ioUsage.formatF()}%)   "
+    tb.write fmt"{name} {used.formatUU()} / {disk.total.formatU()} (rwt: {disk.ioUsageRead.formatF()}/{disk.ioUsageWrite.formatF()}/{disk.ioUsage.formatF()}%)   "
     inc i
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =

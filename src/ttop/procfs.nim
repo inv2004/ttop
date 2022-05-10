@@ -262,7 +262,7 @@ proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
     let name = parts[2]
     if name in result:
       let io = parseUInt parts[12]
-      echo "DDD1: ", prevInfo.disk
+      echo "DDD1: ", prevInfo.disk, " ", io
       result[name].io = io
       echo "DDD2: ", prevInfo.disk
       let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
@@ -274,6 +274,6 @@ proc fullInfo*(sortOrder = Pid): FullInfo =
   result.mem = memInfo()
   result.pidsInfo = pidsInfo(sortOrder, result.mem)
   result.disk = diskInfo(result.sys.datetime)
-  # prevInfo = result
+  # prevInfo = result.deepCopy()
 
 quit 1

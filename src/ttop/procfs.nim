@@ -51,8 +51,6 @@ type CpuInfo = object
 
 type SysInfo* = object
   datetime*: times.DateTime
-  cpu*: CpuInfo
-  cpus*: seq[CpuInfo]
 
 type Disk = object
   avail*: uint
@@ -72,6 +70,8 @@ type Net = object
 
 type FullInfo* = object
   sys*: SysInfo
+  cpu*: CpuInfo
+  cpus*: seq[CpuInfo]
   mem*: MemInfo
   pidsInfo*: OrderedTable[uint, procfs.PidInfo]
   disk*: OrderedTable[string, Disk]
@@ -279,19 +279,18 @@ proc parseStat(): (CpuInfo, seq[CpuInfo]) =
       let total = all.foldl(a+b)
       let idle = all[3] + all[4]
       if off == 1:
-        let curTotal = total - prevInfo.sys.cpus.getOrDefault(result[1].len).total
-        let curIdle = idle - prevInfo.sys.cpus.getOrDefault(result[1].len).idle
+        let curTotal = total - prevInfo.cpus.getOrDefault(result[1].len).total
+        let curIdle = idle - prevInfo.cpus.getOrDefault(result[1].len).idle
         let cpu = 100 * (curTotal - curIdle) / curTotal
         result[1].add CpuInfo(total: total, idle: idle, cpu: cpu)
       else:
-        let curTotal = total - prevInfo.sys.cpu.total
-        let curIdle = idle - prevInfo.sys.cpu.idle
+        let curTotal = total - prevInfo.cpu.total
+        let curIdle = idle - prevInfo.cpu.idle
         let cpu = 100 * (curTotal - curIdle) / curTotal
         result[0] = CpuInfo(total: total, idle: idle, cpu: cpu)
 
 proc sysInfo*(): SysInfo =
   result.datetime = times.now()
-  (result.cpu, result.cpus) = parseStat()
 
 proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
   # result = initOrderedTable[string, Disk]()
@@ -340,6 +339,7 @@ proc netInfo(): OrderedTable[string, Net] =
 
 proc fullInfo*(sortOrder = Pid): FullInfo =
   result.sys = sysInfo()
+  (result.cpu, result.cpus) = parseStat()
   result.mem = memInfo()
   result.pidsInfo = pidsInfo(sortOrder, result.mem)
   result.disk = diskInfo(result.sys.datetime)

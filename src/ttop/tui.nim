@@ -15,14 +15,13 @@ proc exitProc() {.noconv.} =
 const offset = 2
 
 proc header(tb: var TerminalBuffer, info: FullInfo) =
-  let si = info.sys
   let mi = info.mem
   tb.write(offset, 1, fgWhite)
-  tb.write "RTC: ", si.datetime.format("yyyy-MM-dd  HH:mm:ss"),
+  tb.write "RTC: ", info.sys.datetime.format("yyyy-MM-dd  HH:mm:ss"),
       "                                      PROCS: ", $info.pidsInfo.len
   tb.setCursorPos(offset, 2)
-  tb.write "CPU: ", si.cpu.cpu.formatF().cut(4, false, 0), "%|"
-  for i, cpu in si.cpus:
+  tb.write "CPU: ", info.cpu.cpu.formatF().cut(4, false, 0), "%|"
+  for i, cpu in info.cpus:
     if i > 0:
       tb.write "|"
     if cpu.cpu >= cpuCoreLimit:
@@ -79,7 +78,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
 
   tb.setForegroundColor(fgBlack, true)
   let (x, y) = tb.getCursorPos()
-  tb.drawHorizLine(x, x+10, y)
+  # tb.drawHorizLine(x, x+10, y)
 
   let (w, h) = terminalSize()
   if x + 26 < w:
@@ -145,10 +144,15 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
 proc redraw(curSort: SortField, scrollX, scrollY: int, filter: bool) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
-  tb.setForegroundColor(fgBlack, true)
-  tb.drawRect(0, 0, w-1, h-1)
 
   let info = fullInfo(curSort)
+
+  if int(100.0*info.cpu.cpu) >= cpuCoreLimit:
+    tb.setForegroundColor(fgRed, true)
+  else:
+    tb.setForegroundColor(fgBlack, true)
+  tb.drawRect(0, 0, w-1, h-1)
+
   header(tb, info)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY)
   help(tb, curSort, scrollX, scrollY)

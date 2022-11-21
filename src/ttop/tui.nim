@@ -36,7 +36,7 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
   if memChk >= memLimit:
     tb.write fgRed
   tb.write fmt"MEM: {memStr:16}   ", fgWhite
-  tb.write fmt"DIFF: {sign}{uint(abs(mi.MemDiff)).formatU():10} BUF: {mi.Buffers.formatU():10} CACHE: {mi.Cached.formatU():10}  ", fgWhite
+  tb.write fmt"Δ: {sign}{uint(abs(mi.MemDiff)).formatU():10} BUF: {mi.Buffers.formatU():10} CACHE: {mi.Cached.formatU():10}  ", fgWhite
   let swpStr = fmt"{formatUU(mi.SwapTotal - mi.SwapFree)} / {mi.SwapTotal.formatU()}"
   let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
   if swpChk >= swpLimit:
@@ -63,7 +63,7 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
     inc i
 
 
-proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
+proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
   tb.setCursorPos offset, tb.height - 1
 
   for x in SortField:
@@ -74,14 +74,27 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
       tb.write(str)
     tb.setCursorXPos 0+tb.getCursorXPos()
 
+  tb.write fmt" / - filter "
   tb.write fmt" Q - quit "
 
-  if scrollY > 0:
-    tb.write fmt" Y: {scrollY} "
-  else:
-    tb.setForegroundColor(fgBlack, true)
-    let (x, y) = tb.getCursorPos()
-    tb.drawHorizLine(x, x+10, y)
+  tb.setForegroundColor(fgBlack, true)
+  let (x, y) = tb.getCursorPos()
+  tb.drawHorizLine(x, x+10, y)
+
+  let (w, h) = terminalSize()
+  if x + 26 < w:
+    if scrollX > 0:
+      tb.setCursorXPos(w - 26)
+      tb.write fmt" X: {scrollX}"
+    if scrollY > 0:
+      tb.setCursorXPos(w - 21)
+      tb.write fmt" Y: {scrollY}"
+
+  if x + 15 < w:
+    tb.setCursorXPos(w - 15)
+    tb.write fmt " W: {w} H: {h} "
+  
+  # else:
 
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int) =
@@ -129,7 +142,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     tb.write ' '.repeat(tb.width-10)
     inc y
 
-proc redraw(curSort: SortField, scrollX, scrollY: int) =
+proc redraw(curSort: SortField, scrollX, scrollY: int, filter: bool) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
   tb.setForegroundColor(fgBlack, true)
@@ -138,16 +151,18 @@ proc redraw(curSort: SortField, scrollX, scrollY: int) =
   let info = fullInfo(curSort)
   header(tb, info)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY)
-  help(tb, curSort, scrollY)
+  help(tb, curSort, scrollX, scrollY)
   tb.display()
 
 proc run*() =
   illwillInit(fullscreen = true)
   setControlCHook(exitProc)
   hideCursor()
+  var draw = false
   var curSort = Cpu
   var scrollX, scrollY = 0
-  redraw(curSort, scrollX, scrollY)
+  var filter = false
+  redraw(curSort, scrollX, scrollY, filter)
 
   var refresh = 0
   while true:
@@ -158,25 +173,36 @@ proc run*() =
     # tb.write(30, 2, resetStyle)
     case key
     of Key.Escape, Key.Q: exitProc()
-    of Key.Space: redraw(curSort, scrollX, scrollY)
+    of Key.Space: draw = true
     of Key.Left:
       if scrollX > 0: dec scrollX
-      redraw(curSort, scrollX, scrollY)
-    of Key.Right: inc scrollX; redraw(curSort, scrollX, scrollY)
+      draw = true
+    of Key.Right:
+      inc scrollX;
+      draw = true
     of Key.Up:
       if scrollY > 0: dec scrollY
-      redraw(curSort, scrollX, scrollY)
-    of Key.Down: inc scrollY; redraw(curSort, scrollX, scrollY)
-    of Key.P: curSort = Pid; redraw(curSort, scrollX, scrollY)
-    of Key.M: curSort = Mem; redraw(curSort, scrollX, scrollY)
-    of Key.I: curSort = Io; redraw(curSort, scrollX, scrollY)
-    of Key.N: curSort = Name; redraw(curSort, scrollX, scrollY)
-    of Key.C: curSort = Cpu; redraw(curSort, scrollX, scrollY)
+      draw = true
+    of Key.PageUp:
+      if scrollY > 0: scrollY -= 10
+      if scrollY < 0: scrollY = 0
+      draw = true
+    of Key.Down: inc scrollY; draw = true
+    of Key.PageDown:
+      scrollY += 10
+      draw = true
+    of Key.P: curSort = Pid; draw = true
+    of Key.M: curSort = Mem; draw = true
+    of Key.I: curSort = Io; draw = true
+    of Key.N: curSort = Name; draw = true
+    of Key.C: curSort = Cpu; draw = true
+    of Key.Slash: filter = true; draw = true
     else: discard
 
-    if refresh == 10:
-      redraw(curSort, scrollX, scrollY)
+    if draw or refresh == 10:
+      redraw(curSort, scrollX, scrollY, filter)
       refresh = 0
+      draw = false
     else:
       inc refresh
 

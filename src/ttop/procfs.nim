@@ -13,7 +13,7 @@ const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
 
 type SortField* = enum
-  Cpu, Rss, Io, Pid, Name
+  Cpu, Mem, Io, Pid, Name
 
 type MemInfo* = object
   MemTotal*: uint
@@ -41,6 +41,8 @@ type PidInfo* = object
   uptime*: int
   ioRead*, ioWrite*: uint
   ioReadDiff*, ioWriteDiff*: uint
+  netIn*, netOut*: uint
+  netInDiff*, netOutDiff*: uint
 
 type CpuInfo = object
   total*: int
@@ -90,7 +92,7 @@ proc formatU*(b: uint): string =
     fbytes: float
     lastXb: int64 = bytes
     matchedIndex = 0
-    prefixes: array[9, string] = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"]
+    prefixes: array[9, string] = ["B", "k", "M", "G", "T", "P", "E", "Z", "Y"]
   for index in 1..<prefixes.len:
     lastXb = xb
     xb = bytes div (1'i64 shl (index*10))
@@ -100,11 +102,15 @@ proc formatU*(b: uint): string =
       matchedIndex = index - 1
       break
   fbytes = bytes.float / (1'i64 shl (matchedIndex*10)).float
-  result = formatFloat(fbytes, format = ffDecimal, precision = 2, decimalSep = '.')
+  result = formatFloat(fbytes, format = ffDecimal, precision = 2,
+      decimalSep = '.')
   result.trimZeros(',')
-  result &= " "
-  result &= prefixes[matchedIndex]
-  result &= "B"
+  if matchedIndex > 0:
+    result &= " "
+    result &= prefixes[matchedIndex]
+    result &= "B"
+  else:
+    result &= " B "
 
 proc formatUU*(b: uint): string =
   let bytes = int b
@@ -123,7 +129,8 @@ proc formatUU*(b: uint): string =
       matchedIndex = index - 1
       break
   fbytes = bytes.float / (1'i64 shl (matchedIndex*10)).float
-  result = formatFloat(fbytes, format = ffDecimal, precision = 2, decimalSep = '.')
+  result = formatFloat(fbytes, format = ffDecimal, precision = 2,
+      decimalSep = '.')
   result.trimZeros(',')
 
 proc cut*(str: string, size: int, right: bool, scroll: int): string =
@@ -133,7 +140,7 @@ proc cut*(str: string, size: int, right: bool, scroll: int): string =
     if max >= str.high:
       str[^size..max] & ' '
     else:
-        str[scroll..<max] & "."
+      str[scroll..<max] & "."
   else:
     if right:
       ' '.repeat(size - l) & str
@@ -202,6 +209,25 @@ proc parseIO(pid: uint): (uint, uint, uint, uint) =
       result[1] = parseUInt parts[1].strip()
       result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).ioWrite
 
+proc parseNet(pid: uint): (uint, uint, uint, uint) =
+  let file = PROCFS & "/" & $pid & "/net/netstat"
+  var header = false
+  for line in lines(file):
+    let parts = line.split(":", 1)
+    case parts[0]
+    of "IpExt":
+      if not header:
+        header = true
+      else:
+        let stats = parts[1].split(" ")
+        result[0] = parseUInt stats[6]
+        result[1] = parseUInt stats[7]
+        result[2] = result[0] - prevInfo.pidsInfo.getOrDefault(pid).netIn
+        result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).netOut
+        break
+    else:
+      discard
+
 proc parsePid(pid: uint, uptime: int, mem: MemInfo): PidInfo =
   result = parseStat(pid, uptime, mem)
   try:
@@ -212,7 +238,17 @@ proc parsePid(pid: uint, uptime: int, mem: MemInfo): PidInfo =
     result.ioWriteDiff = io[3]
   except IOError:
     discard
-  result.cmd = readLines(PROCFS & "/" & $pid & "/cmdline", 1)[0].replace('\0', ' ').strip(false, true, {'\0'})
+  try:
+    let net = parseNet(pid)
+    result.netIn = net[0]
+    result.netInDiff = net[2]
+    result.netOut = net[1]
+    result.netOutDiff = net[3]
+  except IOError:
+    discard
+  for line in lines(PROCFS & "/" & $pid & "/cmdline"):
+    result.cmd = line.replace('\0', ' ').strip(false, true, {'\0'})
+    break
 
 proc pids*(): seq[uint] =
   for f in walkDir(PROCFS):
@@ -226,15 +262,15 @@ proc pids*(): seq[uint] =
 proc sortFunc(sortOrder: SortField): auto =
   case sortOrder
   of Pid: return proc(a, b: (uint, PidInfo)): int =
-                    cmp a[1].pid, b[1].pid
+    cmp a[1].pid, b[1].pid
   of Name: return proc(a, b: (uint, PidInfo)): int =
-                    cmp a[1].name, b[1].name
-  of Rss: return proc(a, b: (uint, PidInfo)): int =
-                    cmp b[1].rss, a[1].rss
+    cmp a[1].name, b[1].name
+  of Mem: return proc(a, b: (uint, PidInfo)): int =
+    cmp b[1].rss, a[1].rss
   of Io: return proc(a, b: (uint, PidInfo)): int =
-                    cmp b[1].ioReadDiff+b[1].ioWriteDiff, a[1].ioReadDiff+a[1].ioWriteDiff
+    cmp b[1].ioReadDiff+b[1].ioWriteDiff, a[1].ioReadDiff+a[1].ioWriteDiff
   of Cpu: return proc(a, b: (uint, PidInfo)): int =
-                    cmp b[1].cpu, a[1].cpu
+    cmp b[1].cpu, a[1].cpu
 
 proc pidsInfo*(sortOrder: SortField, memInfo: MemInfo): OrderedTable[uint, PidInfo] =
   let uptime = parseUptime()
@@ -278,14 +314,15 @@ proc sysInfo*(): SysInfo =
   (result.cpu, result.cpus) = parseStat()
 
 proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
-  var result = initOrderedTable[string, Disk]()
+  result = initOrderedTable[string, Disk]()
   for line in lines(MOUNT):
     if line.startsWith("/dev/"):
       let parts = line.split(maxsplit = 2)
       let name = parts[0][5..^1]
       var stat: Statvfs
       assert 0 == statvfs(cstring parts[1], stat)
-      result[name] = Disk(avail: stat.f_bfree * stat.f_bsize, total: stat.f_blocks * stat.f_bsize)
+      result[name] = Disk(avail: stat.f_bfree * stat.f_bsize,
+          total: stat.f_blocks * stat.f_bsize)
   for line in lines(DISKSTATS):
     let parts = line.splitWhitespace()
     let name = parts[2]
@@ -293,13 +330,16 @@ proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
       let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
       let io = parseUInt parts[12]
       result[name].io = io
-      result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(name).io) / float msPassed
+      result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(
+          name).io) / float msPassed
       let ioRead = parseUInt parts[6]
       result[name].ioRead = ioRead
-      result[name].ioUsageRead = 100 * float(ioRead - prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
+      result[name].ioUsageRead = 100 * float(ioRead -
+          prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
       let ioWrite = parseUInt parts[10]
       result[name].ioWrite = ioWrite
-      result[name].ioUsageWrite = 100 * float(ioWrite - prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
+      result[name].ioUsageWrite = 100 * float(ioWrite -
+          prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
   return result
 
 proc fullInfo*(sortOrder = Pid): FullInfo =

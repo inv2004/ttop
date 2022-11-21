@@ -51,6 +51,17 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
       tb.write " | "
     tb.write fmt"{name} {used.formatUU()} / {disk.total.formatU()} (rw: {disk.ioUsageRead.formatF()}/{disk.ioUsageWrite.formatF()}%)"
     inc i
+  tb.setCursorPos(offset, 5)
+  tb.write fmt"NET: "
+  i = 0
+  for name, net in info.net:
+    if net.netIn == 0 or net.netOut == 0:
+      continue
+    if i > 0:
+      tb.write " | "
+    tb.write fmt"{name} {net.netInDiff.formatUU()}/{net.netOutDiff.formatU()}"
+    inc i
+
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
   tb.setCursorPos offset, tb.height - 1
@@ -74,8 +85,8 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollY: int) =
 
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int) =
-  var y = 6
-  tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<9} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>15} {"r/t NET":>15} {"UP":>8}""",
+  var y = 7
+  tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<9} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>15} {"UP":>8}""",
       ' '.repeat(tb.width-72), bgNone)
   inc y
   var i: uint = 0
@@ -103,10 +114,6 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     var rwStr = ""
     if p.ioReadDiff + p.ioWriteDiff > 0:
       rwStr = fmt"{p.ioReadDiff.formatUU()}/{p.ioWriteDiff.formatU()}"
-    tb.write rwStr.cut(15, true, scrollX), " "
-    rwStr = ""
-    if p.netInDiff + p.netOutDiff > 0:
-      rwStr = fmt"{p.netInDiff.formatUU()}/{p.netOutDiff.formatU()}"
     tb.write rwStr.cut(15, true, scrollX), " "
 
     tb.write p.uptime.formatT().cut(8, false, scrollX)

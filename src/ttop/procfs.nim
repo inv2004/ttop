@@ -64,11 +64,18 @@ type Disk = object
   ioUsageRead*: float
   ioUsageWrite*: float
 
+type Net = object
+  netIn*: uint
+  netInDiff*: uint
+  netOut*: uint
+  netOutDiff*: uint
+
 type FullInfo* = object
   sys*: SysInfo
   mem*: MemInfo
   pidsInfo*: OrderedTable[uint, procfs.PidInfo]
   disk*: OrderedTable[string, Disk]
+  net*: OrderedTable[string, Net]
 
 const MOUNT = "/proc/mounts"
 const DISKSTATS = "/proc/diskstats"
@@ -209,25 +216,6 @@ proc parseIO(pid: uint): (uint, uint, uint, uint) =
       result[1] = parseUInt parts[1].strip()
       result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).ioWrite
 
-proc parseNet(pid: uint): (uint, uint, uint, uint) =
-  let file = PROCFS & "/" & $pid & "/net/netstat"
-  var header = false
-  for line in lines(file):
-    let parts = line.split(":", 1)
-    case parts[0]
-    of "IpExt":
-      if not header:
-        header = true
-      else:
-        let stats = parts[1].split(" ")
-        result[0] = parseUInt stats[6]
-        result[1] = parseUInt stats[7]
-        result[2] = result[0] - prevInfo.pidsInfo.getOrDefault(pid).netIn
-        result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).netOut
-        break
-    else:
-      discard
-
 proc parsePid(pid: uint, uptime: int, mem: MemInfo): PidInfo =
   result = parseStat(pid, uptime, mem)
   try:
@@ -236,14 +224,6 @@ proc parsePid(pid: uint, uptime: int, mem: MemInfo): PidInfo =
     result.ioReadDiff = io[2]
     result.ioWrite = io[1]
     result.ioWriteDiff = io[3]
-  except IOError:
-    discard
-  try:
-    let net = parseNet(pid)
-    result.netIn = net[0]
-    result.netInDiff = net[2]
-    result.netOut = net[1]
-    result.netOutDiff = net[3]
   except IOError:
     discard
   for line in lines(PROCFS & "/" & $pid & "/cmdline"):
@@ -314,7 +294,7 @@ proc sysInfo*(): SysInfo =
   (result.cpu, result.cpus) = parseStat()
 
 proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
-  result = initOrderedTable[string, Disk]()
+  # result = initOrderedTable[string, Disk]()
   for line in lines(MOUNT):
     if line.startsWith("/dev/"):
       let parts = line.split(maxsplit = 2)
@@ -342,9 +322,26 @@ proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
           prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
   return result
 
+proc netInfo(): OrderedTable[string, Net] =
+  let file = PROCFS & "/net/dev"
+  for line in lines(file):
+    let parts = line.split(":", 1)
+    if parts.len == 2:
+      let name = parts[0].strip()
+      let fields = parts[1].splitWhitespace()
+      let netIn = parseUInt fields[0]
+      let netOut = parseUInt fields[8]
+      result[name] = Net(
+        netIn: netIn,
+        netInDiff: netIn - prevInfo.net.getOrDefault(name).netIn,
+        netOut: netOut,
+        netOutDiff: netOut - prevInfo.net.getOrDefault(name).netOut
+      )
+
 proc fullInfo*(sortOrder = Pid): FullInfo =
   result.sys = sysInfo()
   result.mem = memInfo()
   result.pidsInfo = pidsInfo(sortOrder, result.mem)
   result.disk = diskInfo(result.sys.datetime)
+  result.net = netInfo()
   prevInfo = result

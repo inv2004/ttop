@@ -30,7 +30,9 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
   tb.setCursorXPos 70
   tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
   tb.setCursorPos(offset, 2)
-  tb.write "CPU: ", info.cpu.cpu.formatP(true), "  %|"
+  if info.cpu.cpu > cpuLimit:
+    tb.write bgRed
+  tb.write "CPU: ", info.cpu.cpu.formatP(true), bgNone, "  %|"
   tb.write info.cpus.mapIt(it.cpu.formatP).join("|")
   tb.write "|%"
   tb.setCursorPos(offset, 3)
@@ -38,13 +40,13 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
   let sign = if mi.MemDiff > 0: '+' elif mi.MemDiff == 0: '=' else: '-'
   let memChk = 100 * float(mi.MemTotal - mi.MemFree) / float(mi.MemTotal)
   if memChk >= memLimit:
-    tb.write fgRed
-  tb.write fmt"MEM: {memStr}", fgWhite
+    tb.write bgRed
+  tb.write fmt"MEM: {memStr}", bgNone
   tb.write fmt"  {sign&abs(mi.MemDiff).formatS():>9}    BUF: {mi.Buffers.formatS()}    CACHE: {mi.Cached.formatS()}"
   let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
   if swpChk >= swpLimit:
-    tb.write fgRed
-  tb.write fmt"    SWP: {formatS(mi.SwapTotal - mi.SwapFree, mi.SwapTotal)}", fgWhite
+    tb.write bgRed
+  tb.write fmt"    SWP: {formatS(mi.SwapTotal - mi.SwapFree, mi.SwapTotal)}", bgNone
   var i = 0
   for _, disk in info.disk:
     if i mod 2 == 0:
@@ -122,14 +124,14 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
       tb.write fgYellow, p.user.cut(8, false, scrollX), fgWhite, " "
     # tb.write p.vsize.formatU().cut(10, true, scrollX), fgWhite, " "
     if p.mem >= rssLimit:
-      tb.write fgRed
-    tb.write p.rss.formatU().cut(10, true, scrollX), fgWhite, " "
+      tb.write bgRed
+    tb.write p.rss.formatU().cut(10, true, scrollX), bgNone, " "
     if p.mem >= rssLimit:
-      tb.write fgRed
-    tb.write p.mem.formatF().cut(5, true, scrollX), fgWhite, " "
+      tb.write bgRed
+    tb.write p.mem.formatF().cut(5, true, scrollX), bgNone, " "
     if p.cpu >= cpuLimit:
-      tb.write fgRed
-    tb.write p.cpu.formatF().cut(5, true, scrollX), fgWhite, " "
+      tb.write bgRed
+    tb.write p.cpu.formatF().cut(5, true, scrollX), bgNone, " "
     var rwStr = ""
     if p.ioReadDiff + p.ioWriteDiff > 0:
       rwStr = fmt"{formatS(p.ioReadDiff, p.ioWriteDiff)}"

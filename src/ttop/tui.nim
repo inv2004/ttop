@@ -32,7 +32,7 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
   tb.setCursorPos(offset, 2)
   if info.cpu.cpu > cpuLimit:
     tb.write bgRed
-  tb.write "CPU: ", info.cpu.cpu.formatP(true), bgNone, "  %|"
+  tb.write styleDim, "CPU: ", styleBright, info.cpu.cpu.formatP(true), bgNone, "  %|"
   tb.write info.cpus.mapIt(it.cpu.formatP).join("|")
   tb.write "|%"
   tb.setCursorPos(offset, 3)
@@ -41,7 +41,7 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
   let memChk = 100 * float(mi.MemTotal - mi.MemFree) / float(mi.MemTotal)
   if memChk >= memLimit:
     tb.write bgRed
-  tb.write fmt"MEM: {memStr}", bgNone
+  tb.write styleDim, "MEM: ", styleBright, memStr, bgNone
   tb.write fmt"  {sign&abs(mi.MemDiff).formatS():>9}    BUF: {mi.Buffers.formatS()}    CACHE: {mi.Cached.formatS()}"
   let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
   if swpChk >= swpLimit:
@@ -52,7 +52,7 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
     if i mod 2 == 0:
       tb.setCursorPos offset, 4+(i div 2)
       if i == 0:
-        tb.write "DSK: "
+        tb.write styleDim, "DSK: ", styleBright
       else:
         tb.write "  "
     if i > 0:
@@ -60,7 +60,7 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
     tb.write fgBlue, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
     inc i
   tb.setCursorPos(offset, tb.getCursorYPos + 1)
-  tb.write fmt"NET: "
+  tb.write styleDim, "NET: ", styleBright
   i = 0
   for name, net in info.net:
     if net.netIn == 0 or net.netOut == 0:

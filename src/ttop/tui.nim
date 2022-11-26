@@ -6,6 +6,8 @@ import strformat
 import tables
 import times
 import limits
+import format
+import sequtils
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
@@ -14,43 +16,48 @@ proc exitProc() {.noconv.} =
 
 const offset = 2
 
+proc writeR(tb: var TerminalBuffer, s: string) =
+  let x = terminalWidth() - s.len - offset
+  if tb.getCursorXPos < x:
+    tb.setCursorXPos x
+    tb.write(s)
+
 proc header(tb: var TerminalBuffer, info: FullInfo) =
   let mi = info.mem
   tb.write(offset, 1, fgWhite)
-  tb.write "RTC: ", info.sys.datetime.format("yyyy-MM-dd  HH:mm:ss"),
-      "                                      PROCS: ", $info.pidsInfo.len
+  tb.write fgBlue, info.sys.hostname, fgWhite, ": ", info.sys.datetime.format(
+      "yyyy-MM-dd HH:mm:ss")
+  tb.setCursorXPos 70
+  tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
   tb.setCursorPos(offset, 2)
-  tb.write "CPU: ", info.cpu.cpu.formatF().cut(4, false, 0), "%|"
-  for i, cpu in info.cpus:
-    if i > 0:
-      tb.write "|"
-    if cpu.cpu >= cpuCoreLimit:
-      tb.write fgRed
-    tb.write cpu.cpu.formatF().cut(4, true, 0), fgNone
-  tb.write " |%"
+  tb.write "CPU: ", info.cpu.cpu.formatP(true), "  %|"
+  tb.write info.cpus.mapIt(it.cpu.formatP).join("|")
+  tb.write "|%"
   tb.setCursorPos(offset, 3)
-  let memStr = fmt"{formatUU(mi.MemTotal - mi.MemFree)} / {mi.MemTotal.formatU()}"
+  let memStr = formatS(mi.MemTotal - mi.MemFree, mi.MemTotal)
   let sign = if mi.MemDiff > 0: '+' elif mi.MemDiff == 0: '=' else: '-'
   let memChk = 100 * float(mi.MemTotal - mi.MemFree) / float(mi.MemTotal)
   if memChk >= memLimit:
     tb.write fgRed
-  tb.write fmt"MEM: {memStr:16}   ", fgWhite
-  tb.write fmt"Δ: {sign}{uint(abs(mi.MemDiff)).formatU():10} BUF: {mi.Buffers.formatU():10} CACHE: {mi.Cached.formatU():10}  ", fgWhite
-  let swpStr = fmt"{formatUU(mi.SwapTotal - mi.SwapFree)} / {mi.SwapTotal.formatU()}"
+  tb.write fmt"MEM: {memStr}", fgWhite
+  tb.write fmt"  {sign&abs(mi.MemDiff).formatS():>9}    BUF: {mi.Buffers.formatS()}    CACHE: {mi.Cached.formatS()}"
   let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
   if swpChk >= swpLimit:
     tb.write fgRed
-  tb.write fmt"SWP: {swpStr:16}"
-  tb.setCursorPos(offset, 4)
-  tb.write fmt"DSK: "
+  tb.write fmt"    SWP: {formatS(mi.SwapTotal - mi.SwapFree, mi.SwapTotal)}", fgWhite
   var i = 0
-  for name, disk in info.disk:
-    let used = disk.total - disk.avail
+  for _, disk in info.disk:
+    if i mod 2 == 0:
+      tb.setCursorPos offset, 4+(i div 2)
+      if i == 0:
+        tb.write "DSK: "
+      else:
+        tb.write "  "
     if i > 0:
       tb.write " | "
-    tb.write fmt"{name} {used.formatUU()} / {disk.total.formatU()} (rw: {disk.ioUsageRead.formatF()}/{disk.ioUsageWrite.formatF()}%)"
+    tb.write fgBlue, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
     inc i
-  tb.setCursorPos(offset, 5)
+  tb.setCursorPos(offset, tb.getCursorYPos + 1)
   tb.write fmt"NET: "
   i = 0
   for name, net in info.net:
@@ -58,9 +65,9 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
       continue
     if i > 0:
       tb.write " | "
-    tb.write fmt"{name} {net.netInDiff.formatUU()}/{net.netOutDiff.formatU()}"
+    tb.write fgMagenta, name, fgWhite, " ", formatS(net.netInDiff,
+        net.netOutDiff)
     inc i
-
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
   tb.setCursorPos offset, tb.height - 1
@@ -92,7 +99,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
   if x + 15 < w:
     tb.setCursorXPos(w - 15)
     tb.write fmt " W: {w} H: {h} "
-  
+
   # else:
 
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
@@ -125,7 +132,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     tb.write p.cpu.formatF().cut(5, true, scrollX), fgWhite, " "
     var rwStr = ""
     if p.ioReadDiff + p.ioWriteDiff > 0:
-      rwStr = fmt"{p.ioReadDiff.formatUU()}/{p.ioWriteDiff.formatU()}"
+      rwStr = fmt"{formatS(p.ioReadDiff, p.ioWriteDiff)}"
     tb.write rwStr.cut(15, true, scrollX), " "
 
     tb.write p.uptime.formatT().cut(8, false, scrollX)
@@ -147,7 +154,7 @@ proc redraw(curSort: SortField, scrollX, scrollY: int, filter: bool) =
 
   let info = fullInfo(curSort)
 
-  if int(100.0*info.cpu.cpu) >= cpuCoreLimit:
+  if info.cpu.cpu >= cpuCoreLimit:
     tb.setForegroundColor(fgRed, true)
   else:
     tb.setForegroundColor(fgBlack, true)
@@ -171,10 +178,6 @@ proc run*() =
   var refresh = 0
   while true:
     var key = getKey()
-    # if key != Key.None:
-    #   tb.write(80, 1, resetStyle, "Key pressed: ", fgGreen, $key, "    ")
-    #   tb.write(80, 2, resetStyle, "W: ", fgGreen, $tb.width)
-    # tb.write(30, 2, resetStyle)
     case key
     of Key.Escape, Key.Q: exitProc()
     of Key.Space: draw = true

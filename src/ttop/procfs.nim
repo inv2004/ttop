@@ -4,6 +4,7 @@ import os
 import strutils
 from posix import Uid, getpwuid
 import posix_utils
+import nativesockets
 import times
 import strformat
 import tables
@@ -11,6 +12,7 @@ import sequtils
 
 const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
+const SECTOR = 512
 
 type SortField* = enum
   Cpu, Mem, Io, Pid, Name
@@ -51,6 +53,7 @@ type CpuInfo = object
 
 type SysInfo* = object
   datetime*: times.DateTime
+  hostname*: string
 
 type Disk = object
   avail*: uint
@@ -58,9 +61,10 @@ type Disk = object
   io*: uint
   ioRead*: uint
   ioWrite*: uint
-  ioUsage*: float
-  ioUsageRead*: float
-  ioUsageWrite*: float
+  ioUsage*: uint
+  ioUsageRead*: uint
+  ioUsageWrite*: uint
+  path*: string
 
 type Net = object
   netIn*: uint
@@ -209,10 +213,10 @@ proc parseIO(pid: uint): (uint, uint, uint, uint) =
   for line in lines(file):
     let parts = line.split(":", 1)
     case parts[0]
-    of "rchar":
+    of "read_bytes":
       result[0] = parseUInt parts[1].strip()
       result[2] = result[0] - prevInfo.pidsInfo.getOrDefault(pid).ioRead
-    of "wchar":
+    of "write_bytes":
       result[1] = parseUInt parts[1].strip()
       result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).ioWrite
 
@@ -291,6 +295,7 @@ proc parseStat(): (CpuInfo, seq[CpuInfo]) =
 
 proc sysInfo*(): SysInfo =
   result.datetime = times.now()
+  result.hostname = getHostName()
 
 proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
   # result = initOrderedTable[string, Disk]()
@@ -301,24 +306,28 @@ proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
       var stat: Statvfs
       assert 0 == statvfs(cstring parts[1], stat)
       result[name] = Disk(avail: stat.f_bfree * stat.f_bsize,
-          total: stat.f_blocks * stat.f_bsize)
+                          total: stat.f_blocks * stat.f_bsize,
+                          path: parts[1])
   for line in lines(DISKSTATS):
     let parts = line.splitWhitespace()
     let name = parts[2]
     if name in result:
-      let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
-      let io = parseUInt parts[12]
+      # let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
+      let io = SECTOR * parseUInt parts[12]
       result[name].io = io
-      result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(
-          name).io) / float msPassed
-      let ioRead = parseUInt parts[6]
+      # result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(
+      #     name).io) / float msPassed
+      result[name].ioUsage = io - prevInfo.disk.getOrDefault(name).io
+      let ioRead = SECTOR * parseUInt parts[6]
       result[name].ioRead = ioRead
-      result[name].ioUsageRead = 100 * float(ioRead -
-          prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
-      let ioWrite = parseUInt parts[10]
+      # result[name].ioUsageRead = 100 * float(ioRead -
+      #     prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
+      result[name].ioUsageRead = ioRead - prevInfo.disk.getOrDefault(name).ioRead
+      let ioWrite = SECTOR * parseUInt parts[10]
       result[name].ioWrite = ioWrite
-      result[name].ioUsageWrite = 100 * float(ioWrite -
-          prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
+      # result[name].ioUsageWrite = 100 * float(ioWrite -
+      #     prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
+      result[name].ioUsageWrite = ioWrite - prevInfo.disk.getOrDefault(name).ioWrite
   return result
 
 proc netInfo(): OrderedTable[string, Net] =

@@ -8,6 +8,7 @@ import times
 import limits
 import format
 import sequtils
+import save
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
@@ -22,12 +23,13 @@ proc writeR(tb: var TerminalBuffer, s: string) =
     tb.setCursorXPos x
     tb.write(s)
 
-proc header(tb: var TerminalBuffer, info: FullInfo) =
+proc header(tb: var TerminalBuffer, info: FullInfo, hist: int) =
   let mi = info.mem
   tb.write(offset, 1, fgWhite)
   tb.write fgBlue, info.sys.hostname, fgWhite, ": ", info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
-  tb.setCursorXPos 70
+  if hist > 0:
+    tb.write "    HIST: ", $hist
   tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
   tb.setCursorPos(offset, 2)
   if info.cpu.cpu > cpuLimit:
@@ -85,9 +87,13 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
     tb.setCursorXPos 0+tb.getCursorXPos()
 
   tb.write " ", HelpCol, "/", fgNone, " - filter "
+  if count() > 0:
+    tb.write " ", HelpCol, "[]", fgNone, " - timeshift "
+  else:
+    tb.write " ", styleDim, "[] - timeshift ", styleBright, fgNone
   tb.write " ", HelpCol, "Q", fgNone, " - quit "
 
-  tb.setForegroundColor(fgBlack, true)
+  # tb.setForegroundColor(fgBlack, true)
   let x = tb.getCursorXPos()
 
   let (w, h) = terminalSize()
@@ -101,7 +107,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
 
   if x + 15 < w:
     tb.setCursorXPos(w - 15)
-    tb.write fmt " W: {w} H: {h} "
+    tb.write fmt " WH: {w}x{h} "
 
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
@@ -156,11 +162,15 @@ proc filter(tb: var TerminalBuffer, filter: string) =
   tb.write " ", HelpCol, "Esc", fgNone, " - Back    Filter: ", bgBlue, filter[
       1..^1], bgNone
 
-proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string) =
+proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string, hist: int) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
-  let info = fullInfo(curSort)
+  let info =
+    if hist == 0:
+      fullInfo(curSort)
+    else:
+      hist(hist)
 
   if info.cpu.cpu >= cpuCoreLimit:
     tb.setForegroundColor(fgRed, true)
@@ -168,7 +178,7 @@ proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string) =
     tb.setForegroundColor(fgBlack, true)
   tb.drawRect(0, 0, w-1, h-1)
 
-  header(tb, info)
+  header(tb, info, hist)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter)
   if filter.len > 0:
     filter(tb, filter)
@@ -181,10 +191,11 @@ proc run*() =
   setControlCHook(exitProc)
   hideCursor()
   var draw = false
+  var hist = 0
   var curSort = Cpu
   var scrollX, scrollY = 0
   var filter = ""
-  redraw(curSort, scrollX, scrollY, filter)
+  redraw(curSort, scrollX, scrollY, filter, hist)
 
   var refresh = 0
   while true:
@@ -216,6 +227,12 @@ proc run*() =
       of Key.N: curSort = Name; draw = true
       of Key.C: curSort = Cpu; draw = true
       of Key.Slash: filter = " "; draw = true
+      of Key.LeftBracket:
+        inc hist
+        draw = true
+      of Key.RightBracket:
+        if hist > 0: dec hist
+        draw = true
       else: discard
     else:
       case key
@@ -238,11 +255,12 @@ proc run*() =
       else: discard
 
     if draw or refresh == 10:
-      redraw(curSort, scrollX, scrollY, filter)
+      redraw(curSort, scrollX, scrollY, filter, hist)
       refresh = 0
-      if not draw:
+      if draw:
+        draw = false
+      else:
         sleep 100
-      draw = false
     else:
       inc refresh
       sleep 100

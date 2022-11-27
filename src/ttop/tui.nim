@@ -75,19 +75,17 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
   tb.setCursorPos offset, tb.height - 1
 
   for x in SortField:
-    let str = fmt" {($x)[0]} - by {x} "
     if x == curSort:
-      tb.write(fgCyan, str, fgNone)
+      tb.write fgCyan, " ", $($x)[0], " - by ", $x, " ", fgNone
     else:
-      tb.write(str)
+      tb.write " ", fgMagenta, $($x)[0], fgNone, " - by ", $x, " "
     tb.setCursorXPos 0+tb.getCursorXPos()
 
-  tb.write fmt" / - filter "
-  tb.write fmt" Q - quit "
+  tb.write " ", fgMagenta, "/", fgNone, " - filter "
+  tb.write " ", fgMagenta, "Q", fgNone, " - quit "
 
   tb.setForegroundColor(fgBlack, true)
-  let (x, y) = tb.getCursorPos()
-  # tb.drawHorizLine(x, x+10, y)
+  let x = tb.getCursorXPos()
 
   let (w, h) = terminalSize()
   if x + 26 < w:
@@ -102,16 +100,17 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
     tb.setCursorXPos(w - 15)
     tb.write fmt " W: {w} H: {h} "
 
-  # else:
-
 proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
-    curSort: SortField, scrollX, scrollY: int) =
+    curSort: SortField, scrollX, scrollY: int,
+    filter: string) =
   var y = 7
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<9} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>15} {"UP":>8}""",
       ' '.repeat(tb.width-72), bgNone)
   inc y
   var i: uint = 0
   for (_, p) in pi.pairs:
+    if filter.len >= 2 and filter[1..^1] notin toLowerAscii(p.cmd):
+      continue
     if i < uint scrollY:
       inc i
       continue
@@ -150,7 +149,12 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     tb.write ' '.repeat(tb.width-10)
     inc y
 
-proc redraw(curSort: SortField, scrollX, scrollY: int, filter: bool) =
+proc filter(tb: var TerminalBuffer, filter: string) =
+  tb.setCursorPos offset, tb.height - 1
+  tb.write " ", fgMagenta, "Esc", fgNone, " - Back    Filter: ", bgBlue, filter[
+      1..^1], bgNone
+
+proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
@@ -163,8 +167,11 @@ proc redraw(curSort: SortField, scrollX, scrollY: int, filter: bool) =
   tb.drawRect(0, 0, w-1, h-1)
 
   header(tb, info)
-  table(tb, info.pidsInfo, curSort, scrollX, scrollY)
-  help(tb, curSort, scrollX, scrollY)
+  table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter)
+  if filter.len > 0:
+    filter(tb, filter)
+  else:
+    help(tb, curSort, scrollX, scrollY)
   tb.display()
 
 proc run*() =
@@ -174,45 +181,67 @@ proc run*() =
   var draw = false
   var curSort = Cpu
   var scrollX, scrollY = 0
-  var filter = false
+  var filter = ""
   redraw(curSort, scrollX, scrollY, filter)
 
   var refresh = 0
   while true:
     var key = getKey()
-    case key
-    of Key.Escape, Key.Q: exitProc()
-    of Key.Space: draw = true
-    of Key.Left:
-      if scrollX > 0: dec scrollX
-      draw = true
-    of Key.Right:
-      inc scrollX;
-      draw = true
-    of Key.Up:
-      if scrollY > 0: dec scrollY
-      draw = true
-    of Key.PageUp:
-      if scrollY > 0: scrollY -= 10
-      if scrollY < 0: scrollY = 0
-      draw = true
-    of Key.Down: inc scrollY; draw = true
-    of Key.PageDown:
-      scrollY += 10
-      draw = true
-    of Key.P: curSort = Pid; draw = true
-    of Key.M: curSort = Mem; draw = true
-    of Key.I: curSort = Io; draw = true
-    of Key.N: curSort = Name; draw = true
-    of Key.C: curSort = Cpu; draw = true
-    of Key.Slash: filter = true; draw = true
-    else: discard
+    if filter.len == 0:
+      case key
+      of Key.Escape, Key.Q: exitProc()
+      of Key.Space: draw = true
+      of Key.Left:
+        if scrollX > 0: dec scrollX
+        draw = true
+      of Key.Right:
+        inc scrollX;
+        draw = true
+      of Key.Up:
+        if scrollY > 0: dec scrollY
+        draw = true
+      of Key.PageUp:
+        if scrollY > 0: scrollY -= 10
+        if scrollY < 0: scrollY = 0
+        draw = true
+      of Key.Down: inc scrollY; draw = true
+      of Key.PageDown:
+        scrollY += 10
+        draw = true
+      of Key.P: curSort = Pid; draw = true
+      of Key.M: curSort = Mem; draw = true
+      of Key.I: curSort = Io; draw = true
+      of Key.N: curSort = Name; draw = true
+      of Key.C: curSort = Cpu; draw = true
+      of Key.Slash: filter = " "; draw = true
+      else: discard
+    else:
+      case key
+      of Key.Escape:
+        filter = ""
+        draw = true
+      of Key.A .. Key.Z:
+        filter.add toLowerAscii($key)
+        draw = true
+      of Key.Backspace:
+        if filter.len >= 2:
+          filter = filter[0..^2]
+          draw = true
+      of Key.Left:
+        if scrollX > 0: dec scrollX
+        draw = true
+      of Key.Right:
+        inc scrollX;
+        draw = true
+      else: discard
 
     if draw or refresh == 10:
       redraw(curSort, scrollX, scrollY, filter)
       refresh = 0
+      if not draw:
+        sleep 100
       draw = false
     else:
       inc refresh
+      sleep 100
 
-    sleep(100)

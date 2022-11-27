@@ -1,4 +1,5 @@
 import strformat
+import times
 
 proc formatP*(f: float, left = false): string =
   # if f < 10.0:
@@ -35,27 +36,43 @@ proc formatS*(a: int): string =
   else:
     fmt "{n:.1f} {s}"
 
-proc formatS*(a, b: int): string =
+proc formatS*(a, b: int, delim = " / "): string =
   let (n1, s1) = formatSPair(a)
   let (n2, s2) = formatSPair(b)
   if s1 == s2:
     if b < 1024:
-      fmt "{n1.int} / {n2.int} {s2}"
+      fmt "{n1.int}{delim}{n2.int} {s2}"
     else:
-      fmt "{n1:.1f} / {n2:.1f} {s2}"
+      fmt "{n1:.1f}{delim}{n2:.1f} {s2}"
   else:
     if a < 1024 and b < 1024:
-      fmt "{n1.int} {s1} / {n2.int} {s2}"
+      fmt "{n1.int} {s1}{delim}{n2.int} {s2}"
     elif a < 1024:
-      fmt "{n1.int} {s1} / {n2:.1f} {s2}"
+      fmt "{n1.int} {s1}{delim}{n2:.1f} {s2}"
     else:
-      fmt "{n1:.1f} {s1} / {n2.int} {s2}"
+      fmt "{n1:.1f} {s1}{delim}{n2.int} {s2}"
+
+proc formatSI*(a, b: int, delim = "/"): string =
+  let (n1, s1) = formatSPair(a)
+  let (n2, s2) = formatSPair(b)
+  if s1 == s2:
+    fmt "{n1.int}{delim}{n2.int}{s2[0]}"
+  else:
+    fmt "{n1.int}{s1[0]}{delim}{n2.int}{s2[0]}"
 
 proc formatS*(a: uint): string =
   formatS(int(a))
 
-proc formatS*(a, b: uint): string =
-  formatS(int(a), int(b))
+proc formatS*(a, b: uint, delim = " / "): string =
+  formatS(int(a), int(b), delim)
+
+proc formatSI*(a, b: uint, delim = "/"): string =
+  formatSI(int(a), int(b), delim)
+
+proc formatT*(ts: int): string =
+  let d = initDuration(seconds = ts)
+  let p = d.toParts()
+  fmt"{p[Days]*24 + p[Hours]:2}:{p[Minutes]:02}:{p[Seconds]:02}"
 
 when isMainModule:
   echo "|", 0.0.formatP, "|"

@@ -88,75 +88,19 @@ proc fullInfo*(sortOrder = Pid): FullInfo
 var prevInfo = fullInfo()
 sleep hz
 
-proc formatT*(ts: int): string =
-  let d = initDuration(seconds = ts)
-  let p = d.toParts()
-  fmt"{p[Days]*24 + p[Hours]:2}:{p[Minutes]:02}:{p[Seconds]:02}"
-
-proc formatF*(f: float): string =
-  f.formatFloat(ffDecimal, 1)
-
-proc formatU*(b: uint): string =
-  let bytes = int b
-  var
-    xb: int64 = bytes
-    fbytes: float
-    lastXb: int64 = bytes
-    matchedIndex = 0
-    prefixes: array[9, string] = ["B", "k", "M", "G", "T", "P", "E", "Z", "Y"]
-  for index in 1..<prefixes.len:
-    lastXb = xb
-    xb = bytes div (1'i64 shl (index*10))
-    matchedIndex = index
-    if xb == 0:
-      xb = lastXb
-      matchedIndex = index - 1
-      break
-  fbytes = bytes.float / (1'i64 shl (matchedIndex*10)).float
-  result = formatFloat(fbytes, format = ffDecimal, precision = 2,
-      decimalSep = '.')
-  result.trimZeros(',')
-  if matchedIndex > 0:
-    result &= " "
-    result &= prefixes[matchedIndex]
-    result &= "B"
-  else:
-    result &= " B "
-
-proc formatUU*(b: uint): string =
-  let bytes = int b
-  var
-    xb: int64 = bytes
-    fbytes: float
-    lastXb: int64 = bytes
-    matchedIndex = 0
-    prefixes: array[9, string] = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"]
-  for index in 1..<prefixes.len:
-    lastXb = xb
-    xb = bytes div (1'i64 shl (index*10))
-    matchedIndex = index
-    if xb == 0:
-      xb = lastXb
-      matchedIndex = index - 1
-      break
-  fbytes = bytes.float / (1'i64 shl (matchedIndex*10)).float
-  result = formatFloat(fbytes, format = ffDecimal, precision = 2,
-      decimalSep = '.')
-  result.trimZeros(',')
-
 proc cut*(str: string, size: int, right: bool, scroll: int): string =
   let l = len(str)
   if l > size:
     let max = min(size+scroll, str.high)
     if max >= str.high:
-      str[^size..max] & ' '
+      str[^size..max]
     else:
-      str[scroll..<max] & "."
+      str[scroll..<max-1] & "."
   else:
     if right:
       ' '.repeat(size - l) & str
     else:
-      str & ' '.repeat(1 + size - l)
+      str & ' '.repeat(size - l)
 
 proc cut*(i: int | uint, size: int, right: bool, scroll: int): string =
   cut($i, size, right, scroll)

@@ -71,6 +71,9 @@ proc header(tb: var TerminalBuffer, info: FullInfo) =
         net.netOutDiff)
     inc i
 
+
+const HelpCol = fgGreen
+
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
   tb.setCursorPos offset, tb.height - 1
 
@@ -78,11 +81,11 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
     if x == curSort:
       tb.write fgCyan, " ", $($x)[0], " - by ", $x, " ", fgNone
     else:
-      tb.write " ", fgMagenta, $($x)[0], fgNone, " - by ", $x, " "
+      tb.write " ", HelpCol, $($x)[0], fgNone, " - by ", $x, " "
     tb.setCursorXPos 0+tb.getCursorXPos()
 
-  tb.write " ", fgMagenta, "/", fgNone, " - filter "
-  tb.write " ", fgMagenta, "Q", fgNone, " - quit "
+  tb.write " ", HelpCol, "/", fgNone, " - filter "
+  tb.write " ", HelpCol, "Q", fgNone, " - quit "
 
   tb.setForegroundColor(fgBlack, true)
   let x = tb.getCursorXPos()
@@ -104,7 +107,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
     filter: string) =
   var y = 7
-  tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<9} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>15} {"UP":>8}""",
+  tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""",
       ' '.repeat(tb.width-72), bgNone)
   inc y
   var i: uint = 0
@@ -115,30 +118,29 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
       inc i
       continue
     tb.setCursorPos offset, y
-    tb.write p.state, fgWhite, " "
-    tb.write p.pid.cut(6, true, scrollX), " "
+    tb.write p.state, fgWhite
+    tb.write " ", p.pid.cut(6, true, scrollX)
     if p.user == "":
-      tb.write fgMagenta, int(p.uid).cut(8, false, scrollX), fgWhite, " "
+      tb.write " ", fgMagenta, int(p.uid).cut(8, false, scrollX), fgWhite
     else:
-      tb.write fgYellow, p.user.cut(8, false, scrollX), fgWhite, " "
-    # tb.write p.vsize.formatU().cut(10, true, scrollX), fgWhite, " "
+      tb.write " ", fgYellow, p.user.cut(8, false, scrollX), fgWhite
     if p.mem >= rssLimit:
       tb.write bgRed
-    tb.write p.rss.formatU().cut(10, true, scrollX), bgNone, " "
+    tb.write " ", p.rss.formatS().cut(10, true, scrollX), bgNone
     if p.mem >= rssLimit:
       tb.write bgRed
-    tb.write p.mem.formatF().cut(5, true, scrollX), bgNone, " "
+    tb.write " ", p.mem.formatP().cut(5, true, scrollX), bgNone
     if p.cpu >= cpuLimit:
       tb.write bgRed
-    tb.write p.cpu.formatF().cut(5, true, scrollX), bgNone, " "
+    tb.write " ", p.cpu.formatP().cut(5, true, scrollX), bgNone
     var rwStr = ""
     if p.ioReadDiff + p.ioWriteDiff > 0:
-      rwStr = fmt"{formatS(p.ioReadDiff, p.ioWriteDiff)}"
-    tb.write rwStr.cut(15, true, scrollX), " "
+      rwStr = fmt"{formatSI(p.ioReadDiff, p.ioWriteDiff)}"
+    tb.write " ", rwStr.cut(9, true, scrollX)
 
-    tb.write p.uptime.formatT().cut(8, false, scrollX)
+    tb.write " ", p.uptime.formatT().cut(8, false, scrollX)
     let cmd = if p.cmd != "": p.cmd else: p.name
-    tb.write fgCyan, cmd.cut(tb.width - 72, false, scrollX), fgWhite
+    tb.write "  ", fgCyan, cmd.cut(tb.width - 72, false, scrollX), fgWhite
 
     inc y
     if y > tb.height-2:
@@ -151,7 +153,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
 
 proc filter(tb: var TerminalBuffer, filter: string) =
   tb.setCursorPos offset, tb.height - 1
-  tb.write " ", fgMagenta, "Esc", fgNone, " - Back    Filter: ", bgBlue, filter[
+  tb.write " ", HelpCol, "Esc", fgNone, " - Back    Filter: ", bgBlue, filter[
       1..^1], bgNone
 
 proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string) =

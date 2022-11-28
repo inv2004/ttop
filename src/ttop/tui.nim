@@ -23,13 +23,15 @@ proc writeR(tb: var TerminalBuffer, s: string) =
     tb.setCursorXPos x
     tb.write(s)
 
-proc header(tb: var TerminalBuffer, info: FullInfoRef, hist: int) =
+proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int) =
   let mi = info.mem
   tb.write(offset, 1, fgWhite)
   tb.write fgBlue, info.sys.hostname, fgWhite, ": ", info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
   if hist > 0:
-    tb.write "    HIST: ", $hist
+    tb.write fmt"    HIST: {hist} / {cnt}"
+  else:
+    tb.write "    autoupdate"
   tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
   tb.setCursorPos(offset, 2)
   if info.cpu.cpu > cpuLimit:
@@ -76,7 +78,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist: int) =
 
 const HelpCol = fgGreen
 
-proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
+proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
 
   for x in SortField:
@@ -87,7 +89,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
     tb.setCursorXPos 0+tb.getCursorXPos()
 
   tb.write " ", HelpCol, "/", fgNone, " - filter "
-  if count() > 0:
+  if cnt > 0:
     tb.write " ", HelpCol, "[]", fgNone, " - timeshift "
   else:
     tb.write " ", styleDim, "[] - timeshift ", styleBright, fgNone
@@ -162,15 +164,15 @@ proc filter(tb: var TerminalBuffer, filter: string) =
   tb.write " ", HelpCol, "Esc", fgNone, " - Back    Filter: ", bgBlue, filter[
       1..^1], bgNone
 
-proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string, hist: int) =
+proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
+    filter: string, hist, cnt: int) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
-  let info =
-    if hist == 0:
-      fullInfo()
-    else:
-      hist(hist)
+  if info == nil:
+    tb.write fmt"blog not found: {hist} / {cnt}"
+    tb.display()
+    return
 
   info.sort(curSort)
 
@@ -180,12 +182,12 @@ proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string, hist: int
     tb.setForegroundColor(fgBlack, true)
   tb.drawRect(0, 0, w-1, h-1)
 
-  header(tb, info, hist)
+  header(tb, info, hist, cnt)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter)
   if filter.len > 0:
     filter(tb, filter)
   else:
-    help(tb, curSort, scrollX, scrollY)
+    help(tb, curSort, scrollX, scrollY, cnt)
   tb.display()
 
 proc run*() =
@@ -197,7 +199,8 @@ proc run*() =
   var curSort = Cpu
   var scrollX, scrollY = 0
   var filter = ""
-  redraw(curSort, scrollX, scrollY, filter, hist)
+  var (info, cnt) = hist(hist)
+  redraw(info, curSort, scrollX, scrollY, filter, hist, cnt)
 
   var refresh = 0
   while true:
@@ -230,10 +233,18 @@ proc run*() =
       of Key.C: curSort = Cpu; draw = true
       of Key.Slash: filter = " "; draw = true
       of Key.LeftBracket:
-        inc hist
+        if cnt > 0:
+          if hist == 0:
+            hist = cnt
+          elif hist > 1:
+            dec hist
         draw = true
       of Key.RightBracket:
-        if hist > 0: dec hist
+        if hist > 0:
+          if hist == cnt:
+            hist = 0
+          else:
+            inc hist
         draw = true
       else: discard
     else:
@@ -257,7 +268,8 @@ proc run*() =
       else: discard
 
     if draw or refresh == 10:
-      redraw(curSort, scrollX, scrollY, filter, hist)
+      (info, cnt) = hist(hist)
+      redraw(info, curSort, scrollX, scrollY, filter, hist, cnt)
       refresh = 0
       if draw:
         draw = false

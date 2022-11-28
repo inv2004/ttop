@@ -6,7 +6,6 @@ from posix import Uid, getpwuid
 import posix_utils
 import nativesockets
 import times
-import strformat
 import tables
 import sequtils
 
@@ -77,14 +76,22 @@ type FullInfo* = object
   cpu*: CpuInfo
   cpus*: seq[CpuInfo]
   mem*: MemInfo
-  pidsInfo*: OrderedTable[uint, procfs.PidInfo]
-  disk*: OrderedTable[string, Disk]
-  net*: OrderedTable[string, Net]
+  pidsInfo*: OrderedTableRef[uint, procfs.PidInfo]
+  disk*: OrderedTableRef[string, Disk]
+  net*: OrderedTableRef[string, Net]
+
+type FullInfoRef* = ref FullInfo
 
 const MOUNT = "/proc/mounts"
 const DISKSTATS = "/proc/diskstats"
 
-proc fullInfo*(sortOrder = Pid): FullInfo
+proc fullInfo*(sortOrder = Pid): FullInfoRef
+proc newFullInfo(): FullInfoRef =
+  new(result)
+  result.pidsInfo = newOrderedTable[uint, procfs.PidInfo]()
+  result.disk = newOrderedTable[string, Disk]()
+  result.net = newOrderedTable[string, Net]()
+
 var prevInfo = fullInfo()
 sleep hz
 
@@ -187,20 +194,8 @@ proc pids*(): seq[uint] =
       except ValueError:
         discard
 
-proc sortFunc(sortOrder: SortField): auto =
-  case sortOrder
-  of Pid: return proc(a, b: (uint, PidInfo)): int =
-    cmp a[1].pid, b[1].pid
-  of Name: return proc(a, b: (uint, PidInfo)): int =
-    cmp a[1].name, b[1].name
-  of Mem: return proc(a, b: (uint, PidInfo)): int =
-    cmp b[1].rss, a[1].rss
-  of Io: return proc(a, b: (uint, PidInfo)): int =
-    cmp b[1].ioReadDiff+b[1].ioWriteDiff, a[1].ioReadDiff+a[1].ioWriteDiff
-  of Cpu: return proc(a, b: (uint, PidInfo)): int =
-    cmp b[1].cpu, a[1].cpu
-
-proc pidsInfo*(sortOrder: SortField, memInfo: MemInfo): OrderedTable[uint, PidInfo] =
+proc pidsInfo*(memInfo: MemInfo): OrderedTableRef[uint, PidInfo] =
+  result = newOrderedTable[uint, PidInfo]()
   let uptime = parseUptime()
   for pid in pids():
     try:
@@ -208,9 +203,6 @@ proc pidsInfo*(sortOrder: SortField, memInfo: MemInfo): OrderedTable[uint, PidIn
     except OSError:
       if osLastError() != OSErrorCode(2):
         raise
-
-  if sortOrder != Pid:
-    sort(result, sortFunc(sortOrder))
 
 proc getOrDefault(s: seq[CpuInfo], i: int): CpuInfo =
   if i < s.len:
@@ -241,8 +233,8 @@ proc sysInfo*(): SysInfo =
   result.datetime = times.now()
   result.hostname = getHostName()
 
-proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
-  # result = initOrderedTable[string, Disk]()
+proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
+  result = newOrderedTable[string, Disk]()
   for line in lines(MOUNT):
     if line.startsWith("/dev/"):
       let parts = line.split(maxsplit = 2)
@@ -274,7 +266,8 @@ proc diskInfo*(dt: DateTime): OrderedTable[string, Disk] =
       result[name].ioUsageWrite = ioWrite - prevInfo.disk.getOrDefault(name).ioWrite
   return result
 
-proc netInfo(): OrderedTable[string, Net] =
+proc netInfo(): OrderedTableRef[string, Net] =
+  result = newOrderedTable[string, Net]()
   let file = PROCFS & "/net/dev"
   for line in lines(file):
     let parts = line.split(":", 1)
@@ -290,11 +283,35 @@ proc netInfo(): OrderedTable[string, Net] =
         netOutDiff: netOut - prevInfo.net.getOrDefault(name).netOut
       )
 
-proc fullInfo*(sortOrder = Pid): FullInfo =
+proc fullInfo*(sortOrder = Pid): FullInfoRef =
+  result = newFullInfo()
+
+  if prevInfo == nil:
+    prevInfo = newFullInfo()
+
   result.sys = sysInfo()
   (result.cpu, result.cpus) = parseStat()
   result.mem = memInfo()
-  result.pidsInfo = pidsInfo(sortOrder, result.mem)
+  result.pidsInfo = pidsInfo(result.mem)
   result.disk = diskInfo(result.sys.datetime)
   result.net = netInfo()
   prevInfo = result
+
+proc sortFunc(sortOrder: SortField): auto =
+  case sortOrder
+  of Pid: return proc(a, b: (uint, PidInfo)): int =
+    cmp a[1].pid, b[1].pid
+  of Name: return proc(a, b: (uint, PidInfo)): int =
+    cmp a[1].name, b[1].name
+  of Mem: return proc(a, b: (uint, PidInfo)): int =
+    cmp b[1].rss, a[1].rss
+  of Io: return proc(a, b: (uint, PidInfo)): int =
+    cmp b[1].ioReadDiff+b[1].ioWriteDiff, a[1].ioReadDiff+a[1].ioWriteDiff
+  of Cpu: return proc(a, b: (uint, PidInfo)): int =
+    cmp b[1].cpu, a[1].cpu
+
+proc sort*(info: FullInfoRef, sortOrder = Pid) =
+  if sortOrder != Pid:
+    sort(info.pidsInfo, sortFunc(sortOrder))
+
+

@@ -17,14 +17,14 @@ proc count*(): int =
 
 proc save*() =
   let info = fullInfo()
-  let buf = compress($$info)
+  let buf = compress($$info[])
   let s = newFileStream(blog, fmAppend)
   s.write buf.len.uint32
   s.write buf
   s.write buf.len.uint32
   s.close()
 
-proc hist*(ii: int): FullInfo =
+proc hist*(ii: int): FullInfoRef =
   let f = open(blog, fmRead)
   defer: f.close()
   let s = newFileStream(f)
@@ -38,8 +38,11 @@ proc hist*(ii: int): FullInfo =
 
   let sz = s.readUInt32.int
   let buf = s.readStr(sz)
-  to[FullInfo](uncompress(buf))
+  let r = to[FullInfo](uncompress(buf))
+  new(result)
+  result[] = r
 
 when isMainModule:
+  import tables
   echo count()
-  echo hist(6)
+  echo hist(1).disk

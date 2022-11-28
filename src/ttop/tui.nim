@@ -23,7 +23,7 @@ proc writeR(tb: var TerminalBuffer, s: string) =
     tb.setCursorXPos x
     tb.write(s)
 
-proc header(tb: var TerminalBuffer, info: FullInfo, hist: int) =
+proc header(tb: var TerminalBuffer, info: FullInfoRef, hist: int) =
   let mi = info.mem
   tb.write(offset, 1, fgWhite)
   tb.write fgBlue, info.sys.hostname, fgWhite, ": ", info.sys.datetime.format(
@@ -109,7 +109,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY: int) =
     tb.setCursorXPos(w - 15)
     tb.write fmt " WH: {w}x{h} "
 
-proc table(tb: var TerminalBuffer, pi: OrderedTable[uint, PidInfo],
+proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
     filter: string) =
   var y = 7
@@ -168,9 +168,11 @@ proc redraw(curSort: SortField, scrollX, scrollY: int, filter: string, hist: int
 
   let info =
     if hist == 0:
-      fullInfo(curSort)
+      fullInfo()
     else:
       hist(hist)
+
+  info.sort(curSort)
 
   if info.cpu.cpu >= cpuCoreLimit:
     tb.setForegroundColor(fgRed, true)

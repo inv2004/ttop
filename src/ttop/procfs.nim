@@ -85,14 +85,15 @@ type FullInfoRef* = ref FullInfo
 const MOUNT = "/proc/mounts"
 const DISKSTATS = "/proc/diskstats"
 
-proc fullInfo*(sortOrder = Pid): FullInfoRef
 proc newFullInfo(): FullInfoRef =
   new(result)
   result.pidsInfo = newOrderedTable[uint, procfs.PidInfo]()
   result.disk = newOrderedTable[string, Disk]()
   result.net = newOrderedTable[string, Net]()
 
-var prevInfo = fullInfo()
+var prevInfo = newFullInfo()
+proc fullInfo*(prev = prevInfo): FullInfoRef
+prevInfo = fullInfo()
 sleep hz
 
 proc cut*(str: string, size: int, right: bool, scroll: int): string =
@@ -283,11 +284,8 @@ proc netInfo(): OrderedTableRef[string, Net] =
         netOutDiff: netOut - prevInfo.net.getOrDefault(name).netOut
       )
 
-proc fullInfo*(sortOrder = Pid): FullInfoRef =
+proc fullInfo*(prev = prevInfo): FullInfoRef =
   result = newFullInfo()
-
-  if prevInfo == nil:
-    prevInfo = newFullInfo()
 
   result.sys = sysInfo()
   (result.cpu, result.cpus) = parseStat()

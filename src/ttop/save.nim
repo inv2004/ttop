@@ -6,12 +6,12 @@ import streams
 const blog = "/tmp/1.blog"
 
 proc hist*(ii: int): (FullInfoRef, int) =
-  let s = newFileStream(blog)
-  if s == nil:
-    return (nil, 0)
-  defer: s.close()
   if ii == 0:
     result[0] = fullInfo()
+  let s = newFileStream(blog)
+  if s == nil:
+    return
+  defer: s.close()
 
   var buf = ""
 
@@ -33,9 +33,8 @@ proc hist*(ii: int): (FullInfoRef, int) =
       result[0] = fullInfo()
 
 proc save*() =
-  var (prevInfo, _) = hist(-1)
-  echo prevInfo.repr
-  let info = if prevInfo == nil: fullInfo() else: fullInfo(prevInfo)
+  var (prev, _) = hist(-1)
+  let info = if prev == nil: fullInfo() else: fullInfo(prev)
   let buf = compress($$info[])
   let s = newFileStream(blog, fmAppend)
   defer: s.close()

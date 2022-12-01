@@ -92,7 +92,7 @@ proc newFullInfo(): FullInfoRef =
   result.net = newOrderedTable[string, Net]()
 
 var prevInfo = newFullInfo()
-proc fullInfo*(prev = prevInfo): FullInfoRef
+proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef
 prevInfo = fullInfo()
 sleep hz
 
@@ -284,8 +284,11 @@ proc netInfo(): OrderedTableRef[string, Net] =
         netOutDiff: netOut - prevInfo.net.getOrDefault(name).netOut
       )
 
-proc fullInfo*(prev = prevInfo): FullInfoRef =
+proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result = newFullInfo()
+
+  if prev != nil:
+    prevInfo = prev
 
   result.sys = sysInfo()
   (result.cpu, result.cpus) = parseStat()

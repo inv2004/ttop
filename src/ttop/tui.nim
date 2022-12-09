@@ -191,6 +191,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   tb.display()
 
 proc run*() =
+  init()
   illwillInit(fullscreen = true)
   setControlCHook(exitProc)
   hideCursor()

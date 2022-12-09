@@ -53,6 +53,7 @@ type CpuInfo = object
 type SysInfo* = object
   datetime*: times.DateTime
   hostname*: string
+  uptimeHz*: int
 
 type Disk = object
   avail*: uint
@@ -72,7 +73,7 @@ type Net = object
   netOutDiff*: uint
 
 type FullInfo* = object
-  sys*: SysInfo
+  sys*: ref SysInfo
   cpu*: CpuInfo
   cpus*: seq[CpuInfo]
   mem*: MemInfo
@@ -91,10 +92,13 @@ proc newFullInfo(): FullInfoRef =
   result.disk = newOrderedTable[string, Disk]()
   result.net = newOrderedTable[string, Net]()
 
-var prevInfo = newFullInfo()
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef
-prevInfo = fullInfo()
-sleep hz
+
+var prevInfo = newFullInfo()
+
+proc init*() =
+  prevInfo = fullInfo()
+  sleep hz
 
 proc cut*(str: string, size: int, right: bool, scroll: int): string =
   let l = len(str)
@@ -137,7 +141,7 @@ proc memInfo(): MemInfo =
     of "SwapFree": result.SwapFree = parseSize(parts[1])
   result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
-proc parseStat(pid: uint, uptime: int, mem: MemInfo): PidInfo =
+proc parseStat(pid: uint, uptimeHz: int, mem: MemInfo): PidInfo =
   let file = PROCFS & "/" & $pid & "/stat"
   let stat = stat(file)
   result.uid = stat.st_uid
@@ -151,13 +155,28 @@ proc parseStat(pid: uint, uptime: int, mem: MemInfo): PidInfo =
   result.state = parts[2]
   result.vsize = parts[22].parseUInt()
   result.rss = pageSize * parts[23].parseUInt()
-  result.uptimeHz = uptime - parts[21].parseInt()
+  result.uptimeHz = uptimeHz - parts[21].parseInt()
   # result.uptimeHz = parts[21].parseInt()
   result.uptime = result.uptimeHz div hz
   result.cpuTime = parts[13].parseInt() + parts[14].parseInt()
   let prevCpuTime = prevInfo.pidsInfo.getOrDefault(pid).cpuTime
-  let prevUptimeHz = prevInfo.pidsInfo.getOrDefault(pid).uptimeHz
-  result.cpu = 100 * (result.cpuTime - prevCpuTime) / (result.uptimeHz - prevUptimeHz)
+  let delta =
+    if pid in prevInfo.pidsInfo:
+      result.uptimeHz - prevInfo.pidsInfo[pid].uptimeHz
+    elif prevInfo.sys != nil:
+      uptimeHz - prevInfo.sys.uptimeHz
+    else:
+      0
+
+  if "save" in result.name:
+    echo delta
+
+  result.cpu =
+    if delta == 0:
+      0.0
+    else:
+      100 * (result.cpuTime - prevCpuTime) / delta
+
   result.mem = float(100 * result.rss) / float(mem.MemTotal)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
@@ -172,8 +191,8 @@ proc parseIO(pid: uint): (uint, uint, uint, uint) =
       result[1] = parseUInt parts[1].strip()
       result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).ioWrite
 
-proc parsePid(pid: uint, uptime: int, mem: MemInfo): PidInfo =
-  result = parseStat(pid, uptime, mem)
+proc parsePid(pid: uint, uptimeHz: int, mem: MemInfo): PidInfo =
+  result = parseStat(pid, uptimeHz, mem)
   try:
     let io = parseIO(pid)
     result.ioRead = io[0]
@@ -195,12 +214,11 @@ proc pids*(): seq[uint] =
       except ValueError:
         discard
 
-proc pidsInfo*(memInfo: MemInfo): OrderedTableRef[uint, PidInfo] =
+proc pidsInfo*(uptimeHz: int, memInfo: MemInfo): OrderedTableRef[uint, PidInfo] =
   result = newOrderedTable[uint, PidInfo]()
-  let uptime = parseUptime()
   for pid in pids():
     try:
-      result[pid] = parsePid(pid, uptime, memInfo)
+      result[pid] = parsePid(pid, uptimeHz, memInfo)
     except OSError:
       if osLastError() != OSErrorCode(2):
         raise
@@ -230,9 +248,11 @@ proc parseStat(): (CpuInfo, seq[CpuInfo]) =
         let cpu = 100 * (curTotal - curIdle) / curTotal
         result[0] = CpuInfo(total: total, idle: idle, cpu: cpu)
 
-proc sysInfo*(): SysInfo =
+proc sysInfo*(): ref SysInfo =
+  new(result)
   result.datetime = times.now()
   result.hostname = getHostName()
+  result.uptimeHz = parseUptime()
 
 proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
   result = newOrderedTable[string, Disk]()
@@ -293,7 +313,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result.sys = sysInfo()
   (result.cpu, result.cpus) = parseStat()
   result.mem = memInfo()
-  result.pidsInfo = pidsInfo(result.mem)
+  result.pidsInfo = pidsInfo(result.sys.uptimeHz, result.mem)
   result.disk = diskInfo(result.sys.datetime)
   result.net = netInfo()
   prevInfo = result

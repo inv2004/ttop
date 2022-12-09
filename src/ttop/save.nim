@@ -43,4 +43,10 @@ proc save*() =
   s.write buf.len.uint32
 
 when isMainModule:
-  echo hist(4)
+  var (prev, _) = hist(-1)
+  let info = if prev == nil: fullInfo() else: fullInfo(prev)
+  import tables
+  import strutils
+  for k, v in info.pidsInfo:
+    if "save" in v.name:
+      echo k, ": ", v

@@ -120,7 +120,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     filter: string) =
   var y = 7
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""",
-      ' '.repeat(tb.width-72), bgNone)
+      ' '.repeat(tb.width-63), bgNone)
   inc y
   var i: uint = 0
   for (_, p) in pi.pairs:
@@ -152,7 +152,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
     tb.write " ", p.uptime.formatT().cut(8, false, scrollX)
     let cmd = if p.cmd != "": p.cmd else: p.name
-    tb.write "  ", fgCyan, cmd.cut(tb.width - 72, false, scrollX), fgWhite
+    tb.write "  ", fgCyan, cmd.cut(tb.width - 65, false, scrollX), fgWhite
 
     inc y
     if y > tb.height-2:

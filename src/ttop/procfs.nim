@@ -107,7 +107,10 @@ proc cut*(str: string, size: int, right: bool, scroll: int): string =
     if max >= str.high:
       str[^size..max]
     else:
-      str[scroll..<max-1] & "."
+      if scroll > 0:
+        "." & str[scroll+1..<max-1] & "."
+      else:
+        str[0..<max-1] & "."
   else:
     if right:
       ' '.repeat(size - l) & str

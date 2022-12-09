@@ -16,6 +16,7 @@ proc exitProc() {.noconv.} =
   quit(0)
 
 const offset = 2
+const HelpCol = fgGreen
 
 proc writeR(tb: var TerminalBuffer, s: string) =
   let x = terminalWidth() - s.len - offset
@@ -75,15 +76,25 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int) =
         net.netOutDiff)
     inc i
 
+import asciigraph
 
-const HelpCol = fgGreen
+proc graph(tb: var TerminalBuffer) =
+  var y = 7
+  tb.setCursorPos offset, y
+  let a = @[1, 10, 5, 7, 10, 70, 100, 100, 50, 30, 10, 0, 0, 0, 15, 35, 70, 80,
+      30, 10, 20]
+  let w = terminalWidth()
+  let gLines = plot(a, width = w - 12, height = 5).split("\n")
+  # height = 5 or 8
+  for i, g in gLines:
+    tb.setCursorPos offset, y+i
+    tb.write g
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
   if cnt > 0:
     tb.write " ", HelpCol, "[]", fgNone, " - timeshift "
   else:
     tb.write " ", styleDim, "[] - timeshift ", styleBright, fgNone
-
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
@@ -118,7 +129,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
 proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
     filter: string) =
-  var y = 7
+  var y = 20
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""",
       ' '.repeat(tb.width-63), bgNone)
   inc y
@@ -189,6 +200,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   tb.drawRect(0, 0, w-1, h-1)
 
   header(tb, info, hist, cnt)
+  graph(tb)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter)
   if filter.len > 0:
     filter(tb, filter, cnt)

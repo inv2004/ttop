@@ -78,6 +78,13 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int) =
 
 const HelpCol = fgGreen
 
+proc timeButtons(tb: var TerminalBuffer, cnt: int) =
+  if cnt > 0:
+    tb.write " ", HelpCol, "[]", fgNone, " - timeshift "
+  else:
+    tb.write " ", styleDim, "[] - timeshift ", styleBright, fgNone
+
+
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
 
@@ -89,10 +96,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
     tb.setCursorXPos 0+tb.getCursorXPos()
 
   tb.write " ", HelpCol, "/", fgNone, " - filter "
-  if cnt > 0:
-    tb.write " ", HelpCol, "[]", fgNone, " - timeshift "
-  else:
-    tb.write " ", styleDim, "[] - timeshift ", styleBright, fgNone
+  timeButtons(tb, cnt)
   tb.write " ", HelpCol, "Q", fgNone, " - quit "
 
   # tb.setForegroundColor(fgBlack, true)
@@ -159,9 +163,11 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write ' '.repeat(tb.width-10)
     inc y
 
-proc filter(tb: var TerminalBuffer, filter: string) =
+proc filter(tb: var TerminalBuffer, filter: string, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
-  tb.write " ", HelpCol, "Esc", fgNone, " - Back    Filter: ", bgBlue, filter[
+  tb.write " ", HelpCol, "Esc", fgNone, " - Back "
+  timeButtons(tb, cnt)
+  tb.write " Filter: ", bgBlue, filter[
       1..^1], bgNone
 
 proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
@@ -185,7 +191,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   header(tb, info, hist, cnt)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter)
   if filter.len > 0:
-    filter(tb, filter)
+    filter(tb, filter, cnt)
   else:
     help(tb, curSort, scrollX, scrollY, cnt)
   tb.display()
@@ -265,6 +271,20 @@ proc run*() =
         draw = true
       of Key.Right:
         inc scrollX;
+        draw = true
+      of Key.LeftBracket:
+        if cnt > 0:
+          if hist == 0:
+            hist = cnt
+          elif hist > 1:
+            dec hist
+        draw = true
+      of Key.RightBracket:
+        if hist > 0:
+          if hist == cnt:
+            hist = 0
+          else:
+            inc hist
         draw = true
       else: discard
 

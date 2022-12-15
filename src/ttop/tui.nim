@@ -78,16 +78,17 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int) =
 
 import asciigraph
 
-proc graph(tb: var TerminalBuffer) =
+proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField) =
   var y = 7
   tb.setCursorPos offset, y
-  let a = @[1, 10, 5, 7, 10, 70, 100, 100, 50, 30, 10, 0, 0, 0, 15, 35, 70, 80,
-      30, 10, 20]
+  var data: seq[float] = @[]
+  for _, s in stats:
+    data.add s.cpu
   let w = terminalWidth()
-  let gLines = plot(a, width = w - 12, height = 5).split("\n")
+  let gLines = plot(data, width = w - 11, height = 4).split("\n")
   # height = 5 or 8
   for i, g in gLines:
-    tb.setCursorPos offset, y+i
+    tb.setCursorPos offset-1, y+i
     tb.write g
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
@@ -182,7 +183,7 @@ proc filter(tb: var TerminalBuffer, filter: string, cnt: int) =
       1..^1], bgNone
 
 proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
-    filter: string, hist, cnt: int) =
+            filter: string, hist, cnt: int, stats: seq[StatV1]) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
@@ -200,7 +201,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   tb.drawRect(0, 0, w-1, h-1)
 
   header(tb, info, hist, cnt)
-  graph(tb)
+  graph(tb, stats, curSort)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter)
   if filter.len > 0:
     filter(tb, filter, cnt)
@@ -218,8 +219,8 @@ proc run*() =
   var curSort = Cpu
   var scrollX, scrollY = 0
   var filter = ""
-  var (info, cnt) = hist(hist)
-  redraw(info, curSort, scrollX, scrollY, filter, hist, cnt)
+  var (info, cnt, stats) = hist(hist)
+  redraw(info, curSort, scrollX, scrollY, filter, hist, cnt, stats)
 
   var refresh = 0
   while true:
@@ -301,8 +302,8 @@ proc run*() =
       else: discard
 
     if draw or refresh == 10:
-      (info, cnt) = hist(hist)
-      redraw(info, curSort, scrollX, scrollY, filter, hist, cnt)
+      (info, cnt, stats) = hist(hist)
+      redraw(info, curSort, scrollX, scrollY, filter, hist, cnt, stats)
       refresh = 0
       if draw:
         draw = false

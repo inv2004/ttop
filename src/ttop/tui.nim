@@ -9,6 +9,7 @@ import limits
 import format
 import sequtils
 import save
+import asciigraph
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
@@ -76,20 +77,30 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int) =
         net.netOutDiff)
     inc i
 
-import asciigraph
+proc graphData(stats: seq[StatV1], sort: SortField): seq[float] =
+  case sort:
+    of Cpu: return stats.mapIt(it.cpu)
+    of Mem: return stats.mapIt(10 * int(it.mem).formatSPair()[0])
+    of Io: return stats.mapIt(float(it.io))
+    else: return stats.mapIt(float(it.prc))
 
-proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField) =
+proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cnt: int) =
+  if stats.len == 0:
+    return
   var y = 7
   tb.setCursorPos offset, y
-  var data: seq[float] = @[]
-  for _, s in stats:
-    data.add s.cpu
+  let data = graphData(stats, sort)
   let w = terminalWidth()
-  let gLines = plot(data, width = w - 11, height = 4).split("\n")
+  let gLines = plot(data, width = w - 10, height = 4).split("\n")
   # height = 5 or 8
   for i, g in gLines:
     tb.setCursorPos offset-1, y+i
     tb.write g
+  if hist > 0:
+    let x = ((hist-1) * (w-10-2)) div (cnt - 1)
+    tb.setCursorPos offset + 7 + x, 12
+    tb.write bgYellow, "^", bgNone
+
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
   if cnt > 0:
@@ -129,8 +140,8 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
 
 proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
-    filter: string) =
-  var y = 20
+    filter: string, statsLen: int) =
+  var y = if statsLen > 0: 13 else: 7
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""",
       ' '.repeat(tb.width-63), bgNone)
   inc y
@@ -201,8 +212,8 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   tb.drawRect(0, 0, w-1, h-1)
 
   header(tb, info, hist, cnt)
-  graph(tb, stats, curSort)
-  table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter)
+  graph(tb, stats, curSort, hist, cnt)
+  table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter, stats.len)
   if filter.len > 0:
     filter(tb, filter, cnt)
   else:

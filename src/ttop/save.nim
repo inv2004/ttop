@@ -7,7 +7,7 @@ import tables
 type StatV1* = object
   prc*: int
   cpu*: float
-  mem*: float
+  mem*: uint
   io*: uint
 
 const blog = "/tmp/1.blog"
@@ -20,8 +20,7 @@ proc saveStat*(s: FileStream, f: FullInfoRef) =
   var stat = StatV1(
     prc: f.pidsInfo.len,
     cpu: f.cpu.cpu,
-    mem: float(f.mem.MemTotal - f.mem.MemFree) / float(100 *
-        f.mem.MemTotal),
+    mem: f.mem.MemTotal - f.mem.MemFree,
     io: io
   )
 
@@ -74,10 +73,6 @@ proc save*() =
   s.write buf.len.uint32
 
 when isMainModule:
-  var (prev, _, _) = hist(-1)
-  let info = if prev == nil: fullInfo() else: fullInfo(prev)
-  import tables
-  import strutils
-  for k, v in info.pidsInfo:
-    if "save" in v.name:
-      echo k, ": ", v
+  var (info, _, stats) = hist(0)
+  for s in stats:
+    echo s

@@ -171,9 +171,6 @@ proc parseStat(pid: uint, uptimeHz: int, mem: MemInfo): PidInfo =
     else:
       0
 
-  if "save" in result.name:
-    echo delta
-
   result.cpu =
     if delta == 0:
       0.0

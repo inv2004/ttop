@@ -60,12 +60,12 @@ proc hist*(ii: int): (FullInfoRef, seq[StatV1], string) =
       new(result[0])
       result[0][] = to[FullInfo](uncompress(buf))
 
-  if ii == -1:
-    if result[1].len > 0:
-      new(result[0])
-      result[0][] = to[FullInfo](uncompress(buf))
-    else:
-      result[0] = fullInfo()
+  # if ii == -1:
+  #   if result[1].len > 0:
+  #     new(result[0])
+  #     result[0][] = to[FullInfo](uncompress(buf))
+  #   else:
+  #     result[0] = fullInfo()
 
 proc save*() =
   var (prev, _, _) = hist(-1)

@@ -273,6 +273,12 @@ proc run*() =
       of Key.RightBracket:
         (blog, hist) = moveBlog(+1, blog, hist, stats.len)
         draw = true
+      of Key.LeftBrace:
+        (blog, hist) = moveBlog(-1, blog, 1, stats.len)
+        draw = true
+      of Key.RightBrace:
+        (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
+        draw = true
       else: discard
     else:
       case key
@@ -293,18 +299,16 @@ proc run*() =
         inc scrollX;
         draw = true
       of Key.LeftBracket:
-        if stats.len > 0:
-          if hist == 0:
-            hist = stats.len
-          elif hist > 1:
-            dec hist
+        (blog, hist) = moveBlog(-1, blog, hist, stats.len)
         draw = true
       of Key.RightBracket:
-        if hist > 0:
-          if hist == stats.len:
-            hist = 0
-          else:
-            inc hist
+        (blog, hist) = moveBlog(+1, blog, hist, stats.len)
+        draw = true
+      of Key.LeftBrace:
+        (blog, hist) = moveBlog(-1, blog, 1, stats.len)
+        draw = true
+      of Key.RightBrace:
+        (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
         draw = true
       else: discard
 

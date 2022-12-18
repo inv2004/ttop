@@ -5,6 +5,8 @@ import streams
 import tables
 import times
 import os
+import sequtils
+import algorithm
 
 type StatV1* = object
   prc*: int
@@ -65,34 +67,34 @@ proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
     else:
       result[0] = fullInfo()
 
-proc prevBlog*(h: int, blog = "9999-99-99.blog"): (string, int) =
+proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
+  if d < 0 and hist == 0 and cnt > 0:
+    return (b, cnt)
+  elif d < 0 and hist > 1:
+    return (b, hist-1)
+  elif d > 0 and hist > 0 and hist < cnt:
+    return (b, hist+1)
   let dir = getCacheDir("ttop")
-  var maxFile = ""
-  for f in walkFiles(os.joinPath(dir, "*.blog")):
-    if f == blog:
-      if maxFile == "":
-        maxFile = blog
-      break
-    elif f > maxFile:
-      maxFile = f
-  result[0] = maxFile
-  if result[0] == blog:
-    result[1] = h
+  let files = sorted toSeq(walkFiles(os.joinPath(dir, "*.blog")))
+  if d == 0 or b == "":
+    return (files[^1], 0)
   else:
-    result[1] = hist(-1, result[0])[1].len
-
-proc nextBlog*(blog: string): (string, int) =
-  let dir = getCacheDir("ttop")
-  var next = false
-  for f in walkFiles(os.joinPath(dir, "*.blog")):
-    if f == blog:
-      next = true
-    elif next:
-      return (f, 1)
-  return (blog, 0)
+    let idx = files.find(b)
+    if d < 0:
+      if idx > 0:
+        return (files[idx-1], hist(-1, files[idx-1])[1].len)
+      else:
+        return (b, 1)
+    elif d > 0:
+      if idx < files.high:
+        return (files[idx+1], 1)
+      else:
+        return (files[^1], 0)
+    else:
+      doAssert false
 
 proc save*() =
-  var (prev, _) = hist(-1, prevBlog(0)[0])
+  var (prev, _) = hist(-1, moveBlog(0, "", 0, 0)[0])
   let info = if prev == nil: fullInfo() else: fullInfo(prev)
   let buf = compress($$info[])
   let path = blogPath(fmAppend)
@@ -106,6 +108,4 @@ proc save*() =
   s.write buf.len.uint32
 
 when isMainModule:
-  var (_, stats) = hist(0)
-  for s in stats:
-    echo s
+  echo moveBlog(0, "")

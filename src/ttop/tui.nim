@@ -230,8 +230,7 @@ proc run*() =
   setControlCHook(exitProc)
   hideCursor()
   var draw = false
-  var hist = 0
-  var blog = prevBlog(hist)[0]
+  var (blog, hist) = moveBlog(0, "", 0, 0)
   var curSort = Cpu
   var scrollX, scrollY = 0
   var filter = ""
@@ -269,20 +268,10 @@ proc run*() =
       of Key.C: curSort = Cpu; draw = true
       of Key.Slash: filter = " "; draw = true
       of Key.LeftBracket:
-        if stats.len > 0:
-          if hist == 0:
-            hist = stats.len
-          elif hist > 1:
-            dec hist
-          elif hist == 1:
-            (blog, hist) = prevBlog(hist, blog)
+        (blog, hist) = moveBlog(-1, blog, hist, stats.len)
         draw = true
       of Key.RightBracket:
-        if hist > 0:
-          if hist == stats.len:
-            (blog, hist) = nextBlog(blog)
-          else:
-            inc hist
+        (blog, hist) = moveBlog(+1, blog, hist, stats.len)
         draw = true
       else: discard
     else:

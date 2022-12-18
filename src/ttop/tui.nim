@@ -10,6 +10,7 @@ import format
 import sequtils
 import save
 import asciigraph
+import os
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
@@ -31,10 +32,11 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   tb.write(offset, 1, fgWhite)
   tb.write fgBlue, info.sys.hostname, fgWhite, ": ", info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
+  let blogShort = extractFilename blog
   if hist > 0:
-    tb.write fmt"    {blog}: {hist} / {cnt}"
+    tb.write fmt"    {blogShort}: {hist} / {cnt}"
   else:
-    tb.write fmt"    autoupdate    {blog}: {cnt}"
+    tb.write fmt"    autoupdate    {blogShort}: {cnt}"
   tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
   tb.setCursorPos(offset, 2)
   if info.cpu.cpu > cpuLimit:
@@ -98,7 +100,8 @@ proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cn
     tb.setCursorPos offset-1, y+i
     tb.write g
   if hist > 0:
-    let x = ((hist-1) * (w-10-2)) div (cnt - 1)
+    let cc = if cnt > 2: cnt - 1 else: 1
+    let x = ((hist-1) * (w-10-2)) div (cc)
     tb.setCursorPos offset + 7 + x, 12
     tb.write bgYellow, "^", bgNone
 
@@ -200,7 +203,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   var tb = newTerminalBuffer(w, h)
 
   if info == nil:
-    tb.write fmt"blog not found: {hist} / {stats.len}"
+    tb.write fmt"blog not found {blog}: {hist} / {stats.len}"
     tb.display()
     return
 
@@ -228,10 +231,11 @@ proc run*() =
   hideCursor()
   var draw = false
   var hist = 0
+  var blog = prevBlog(hist)[0]
   var curSort = Cpu
   var scrollX, scrollY = 0
   var filter = ""
-  var (info, stats, blog) = hist(hist)
+  var (info, stats) = hist(hist, blog)
   redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog)
 
   var refresh = 0
@@ -270,11 +274,13 @@ proc run*() =
             hist = stats.len
           elif hist > 1:
             dec hist
+          elif hist == 1:
+            (blog, hist) = prevBlog(hist, blog)
         draw = true
       of Key.RightBracket:
         if hist > 0:
           if hist == stats.len:
-            hist = 0
+            (blog, hist) = nextBlog(blog)
           else:
             inc hist
         draw = true
@@ -314,7 +320,7 @@ proc run*() =
       else: discard
 
     if draw or refresh == 10:
-      (info, stats, blog) = hist(hist)
+      (info, stats) = hist(hist, blog)
       redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog)
       refresh = 0
       if draw:

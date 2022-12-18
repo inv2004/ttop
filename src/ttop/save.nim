@@ -39,9 +39,7 @@ proc stat(s: FileStream): StatV1 =
   let rsz = s.readData(result.addr, sizeof(StatV1))
   doAssert sz == rsz
 
-proc hist*(ii: int): (FullInfoRef, seq[StatV1], string) =
-  let blog = blogPath()
-  result[2] = extractFilename blog
+proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
   if ii == 0:
     result[0] = fullInfo()
   let s = newFileStream(blog)
@@ -60,15 +58,41 @@ proc hist*(ii: int): (FullInfoRef, seq[StatV1], string) =
       new(result[0])
       result[0][] = to[FullInfo](uncompress(buf))
 
-  # if ii == -1:
-  #   if result[1].len > 0:
-  #     new(result[0])
-  #     result[0][] = to[FullInfo](uncompress(buf))
-  #   else:
-  #     result[0] = fullInfo()
+  if ii == -1:
+    if result[1].len > 0:
+      new(result[0])
+      result[0][] = to[FullInfo](uncompress(buf))
+    else:
+      result[0] = fullInfo()
+
+proc prevBlog*(h: int, blog = "9999-99-99.blog"): (string, int) =
+  let dir = getCacheDir("ttop")
+  var maxFile = ""
+  for f in walkFiles(os.joinPath(dir, "*.blog")):
+    if f == blog:
+      if maxFile == "":
+        maxFile = blog
+      break
+    elif f > maxFile:
+      maxFile = f
+  result[0] = maxFile
+  if result[0] == blog:
+    result[1] = h
+  else:
+    result[1] = hist(-1, result[0])[1].len
+
+proc nextBlog*(blog: string): (string, int) =
+  let dir = getCacheDir("ttop")
+  var next = false
+  for f in walkFiles(os.joinPath(dir, "*.blog")):
+    if f == blog:
+      next = true
+    elif next:
+      return (f, 1)
+  return (blog, 0)
 
 proc save*() =
-  var (prev, _, _) = hist(-1)
+  var (prev, _) = hist(-1, prevBlog(0)[0])
   let info = if prev == nil: fullInfo() else: fullInfo(prev)
   let buf = compress($$info[])
   let path = blogPath(fmAppend)
@@ -82,6 +106,6 @@ proc save*() =
   s.write buf.len.uint32
 
 when isMainModule:
-  var (_, _, stats) = hist(0)
+  var (_, stats) = hist(0)
   for s in stats:
     echo s

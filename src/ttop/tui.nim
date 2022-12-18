@@ -110,9 +110,9 @@ proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cn
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
   if cnt > 0:
-    tb.write " ", HelpCol, "[]", fgNone, " - timeshift "
+    tb.write " ", HelpCol, "[],{}", fgNone, " - timeshift "
   else:
-    tb.write " ", styleDim, "[] - timeshift ", styleBright, fgNone
+    tb.write " ", styleDim, "[],{} - timeshift ", styleBright, fgNone
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int) =
   tb.setCursorPos offset, tb.height - 1

@@ -14,12 +14,6 @@ type StatV1* = object
   mem*: uint
   io*: uint
 
-proc blogPath(mode = fmRead): string =
-  let dir = getCacheDir("ttop")
-  if mode != fmRead and not dirExists(dir):
-    createDir(dir)
-  os.joinPath(dir, now().format("yyyy-MM-dd")).addFileExt("blog")
-
 proc saveStat*(s: FileStream, f: FullInfoRef) =
   var io: uint = 0
   for _, disk in f.disk:
@@ -67,7 +61,7 @@ proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
     else:
       result[0] = fullInfo()
 
-proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
+proc moveBlog*(d: int, b: string, hist, cnt: int, toSave = false): (string, int) =
   if d < 0 and hist == 0 and cnt > 0:
     return (b, cnt)
   elif d < 0 and hist > 1:
@@ -77,7 +71,14 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
   let dir = getCacheDir("ttop")
   let files = sorted toSeq(walkFiles(os.joinPath(dir, "*.blog")))
   if d == 0 or b == "":
-    return (files[^1], 0)
+    if files.len > 0:
+      return (files[^1], 0)
+    elif toSave:
+      if not dirExists(dir):
+        createDir(dir)
+      return (os.joinPath(dir, now().format("yyyy-MM-dd")).addFileExt("blog"), 0)
+    else:
+      return ("", 0)
   else:
     let idx = files.find(b)
     if d < 0:
@@ -94,13 +95,13 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
       doAssert false
 
 proc save*() =
-  var (prev, _) = hist(-1, moveBlog(0, "", 0, 0)[0])
+  var blog = moveBlog(0, "", 0, 0, toSave = true)[0]
+  var (prev, _) = hist(-1, blog)
   let info = if prev == nil: fullInfo() else: fullInfo(prev)
   let buf = compress($$info[])
-  let path = blogPath(fmAppend)
-  let s = newFileStream(path, fmAppend)
+  let s = newFileStream(blog, fmAppend)
   if s == nil:
-    raise newException(IOError, "cannot open " & path)
+    raise newException(IOError, "cannot open " & blog)
   defer: s.close()
   s.saveStat info
   s.write buf.len.uint32

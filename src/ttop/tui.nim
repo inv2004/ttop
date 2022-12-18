@@ -35,6 +35,8 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   let blogShort = extractFilename blog
   if hist > 0:
     tb.write fmt"    {blogShort}: {hist} / {cnt}"
+  elif blog == "":
+    tb.write fmt"    autoupdate    log: disabled"
   else:
     tb.write fmt"    autoupdate    {blogShort}: {cnt}"
   tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
@@ -313,6 +315,8 @@ proc run*() =
       else: discard
 
     if draw or refresh == 10:
+      if hist == 0:
+        blog = moveBlog(+1, blog, stats.len, stats.len)[0]
       (info, stats) = hist(hist, blog)
       redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog)
       refresh = 0

@@ -1,19 +1,34 @@
 import ttop/tui
 import ttop/save
+import ttop/cron
 
 import os
 
 proc isSave(): bool =
   if paramCount() >= 1 and paramStr(1) in ["-s", "--save"]:
     true
-  elif getAppFilename().extractFilename() == "ttop":
+  else:
     false
+
+proc isEnable(): bool =
+  if paramCount() >= 1 and paramStr(1) in ["-enable", "--enable"]:
+    true
+  else:
+    false
+
+proc isDisable(): bool =
+  if paramCount() >= 1 and paramStr(1) in ["-disable", "--disable"]:
+    true
   else:
     false
 
 proc main() =
   try:
-    if isSave():
+    if isEnable():
+      cronSwitch(true)
+    elif isDisable():
+      cronSwitch(false)
+    elif isSave():
       save()
     else:
       run()

@@ -14,6 +14,9 @@ type StatV1* = object
   mem*: uint
   io*: uint
 
+proc flock(fd: FileHandle, op: int): int {.header: "<sys/file.h>",
+    importc: "flock".}
+
 proc saveStat*(s: FileStream, f: FullInfoRef) =
   var io: uint = 0
   for _, disk in f.disk:
@@ -102,7 +105,12 @@ proc save*() =
   let info = if prev == nil: fullInfo() else: fullInfo(prev)
   let buf = compress($$info[])
   let blog = saveBlog()
-  let s = newFileStream(blog, fmAppend)
+  let file = open(blog, fmAppend)
+  if flock(file.getFileHandle, 2 or 4) != 0:
+    writeLine(stderr, "cannot open locked: " & blog)
+    quit 1
+  defer: discard flock(file.getFileHandle, 8)
+  let s = newFileStream(file)
   if s == nil:
     raise newException(IOError, "cannot open " & blog)
   defer: s.close()
@@ -112,4 +120,10 @@ proc save*() =
   s.write buf.len.uint32
 
 when isMainModule:
-  echo moveBlog(0, "")
+  let f = open("/tmp/1", fmAppend)
+  if flock(f.getFileHandle, 2 or 4) != 0:
+    echo "locked"
+  else:
+    sleep 2000
+    # echo flock(f.getFileHandle, 8)
+

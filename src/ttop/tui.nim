@@ -36,14 +36,15 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   if hist > 0:
     tb.write fmt"    {blogShort}: {hist} / {cnt}"
   elif blog == "":
-    tb.write fmt"    autoupdate    log: disabled"
+    tb.write fmt"    autoupdate    log: empty"
   else:
     tb.write fmt"    autoupdate    {blogShort}: {cnt}"
   tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
   tb.setCursorPos(offset, 2)
+  tb.write styleDim, "CPU: ", styleBright
   if info.cpu.cpu > cpuLimit:
     tb.write bgRed
-  tb.write styleDim, "CPU: ", styleBright, info.cpu.cpu.formatP(true), bgNone, "  %|"
+  tb.write info.cpu.cpu.formatP(true), bgNone, "  %|"
   tb.write info.cpus.mapIt(it.cpu.formatP).join("|")
   tb.write "|%"
   tb.setCursorPos(offset, 3)
@@ -96,15 +97,15 @@ proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cn
   tb.setCursorPos offset, y
   let data = graphData(stats, sort)
   let w = terminalWidth()
-  let gLines = plot(data, width = w - 10, height = 4).split("\n")
+  let gLines = plot(data, width = w - 11, height = 4).split("\n")
   # height = 5 or 8
   for i, g in gLines:
     tb.setCursorPos offset-1, y+i
     tb.write g
   if hist > 0:
     let cc = if cnt > 2: cnt - 1 else: 1
-    let x = ((hist-1) * (w-10-2)) div (cc)
-    tb.setCursorPos offset + 7 + x, 12
+    let x = ((hist-1) * (w-11-2)) div (cc)
+    tb.setCursorPos offset + 8 + x, 12
     tb.write "^"
 
 

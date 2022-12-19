@@ -61,7 +61,13 @@ proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
     else:
       result[0] = fullInfo()
 
-proc moveBlog*(d: int, b: string, hist, cnt: int, toSave = false): (string, int) =
+proc saveBlog(): string =
+  let dir = getCacheDir("ttop")
+  if not dirExists(dir):
+    createDir(dir)
+  os.joinPath(dir, now().format("yyyy-MM-dd")).addFileExt("blog")
+
+proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
   if d < 0 and hist == 0 and cnt > 0:
     return (b, cnt)
   elif d < 0 and hist > 1:
@@ -73,10 +79,6 @@ proc moveBlog*(d: int, b: string, hist, cnt: int, toSave = false): (string, int)
   if d == 0 or b == "":
     if files.len > 0:
       return (files[^1], 0)
-    elif toSave:
-      if not dirExists(dir):
-        createDir(dir)
-      return (os.joinPath(dir, now().format("yyyy-MM-dd")).addFileExt("blog"), 0)
     else:
       return ("", 0)
   else:
@@ -95,10 +97,11 @@ proc moveBlog*(d: int, b: string, hist, cnt: int, toSave = false): (string, int)
       doAssert false
 
 proc save*() =
-  var blog = moveBlog(0, "", 0, 0, toSave = true)[0]
-  var (prev, _) = hist(-1, blog)
+  var lastBlog = moveBlog(0, "", 0, 0)[0]
+  var (prev, _) = hist(-1, lastBlog)
   let info = if prev == nil: fullInfo() else: fullInfo(prev)
   let buf = compress($$info[])
+  let blog = saveBlog()
   let s = newFileStream(blog, fmAppend)
   if s == nil:
     raise newException(IOError, "cannot open " & blog)

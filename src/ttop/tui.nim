@@ -105,7 +105,7 @@ proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cn
     let cc = if cnt > 2: cnt - 1 else: 1
     let x = ((hist-1) * (w-10-2)) div (cc)
     tb.setCursorPos offset + 7 + x, 12
-    tb.write bgYellow, "^", bgNone
+    tb.write "^"
 
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
@@ -284,7 +284,7 @@ proc run*() =
       else: discard
     else:
       case key
-      of Key.Escape:
+      of Key.Escape, Key.Enter:
         filter = ""
         draw = true
       of Key.A .. Key.Z:

@@ -215,7 +215,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   if info.cpu.cpu >= cpuCoreLimit:
     tb.setForegroundColor(fgRed, true)
   else:
-    tb.setForegroundColor(fgBlack, true)
+    tb.setForegroundColor(fgWhite, false)
   tb.drawRect(0, 0, w-1, h-1)
 
   header(tb, info, hist, stats.len, blog)

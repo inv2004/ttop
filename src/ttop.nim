@@ -1,6 +1,6 @@
 import ttop/tui
-import ttop/save
-import ttop/cron
+import ttop/blog
+import ttop/onoff
 
 import os
 
@@ -11,13 +11,13 @@ proc isSave(): bool =
     false
 
 proc isEnable(): bool =
-  if paramCount() >= 1 and paramStr(1) in ["-enable", "--enable"]:
+  if paramCount() >= 1 and paramStr(1) in ["-on"]:
     true
   else:
     false
 
 proc isDisable(): bool =
-  if paramCount() >= 1 and paramStr(1) in ["-disable", "--disable"]:
+  if paramCount() >= 1 and paramStr(1) in ["-off"]:
     true
   else:
     false
@@ -25,9 +25,9 @@ proc isDisable(): bool =
 proc main() =
   try:
     if isEnable():
-      cronSwitch(true)
+      onoff(true)
     elif isDisable():
-      cronSwitch(false)
+      onoff(false)
     elif isSave():
       save()
     else:

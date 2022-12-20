@@ -12,7 +12,6 @@ bin = @["ttop"]
 
 requires "nim >= 1.6.4"
 
-requires "terminaltables"
 requires "illwill"
 requires "zippy"
 requires "asciigraph"

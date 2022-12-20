@@ -8,7 +8,7 @@ import times
 import limits
 import format
 import sequtils
-import save
+import blog
 import asciigraph
 import os
 

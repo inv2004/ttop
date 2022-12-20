@@ -11,13 +11,13 @@ proc isSave(): bool =
     false
 
 proc isEnable(): bool =
-  if paramCount() >= 1 and paramStr(1) in ["-on"]:
+  if paramCount() >= 1 and paramStr(1) in ["-on", "--on"]:
     true
   else:
     false
 
 proc isDisable(): bool =
-  if paramCount() >= 1 and paramStr(1) in ["-off"]:
+  if paramCount() >= 1 and paramStr(1) in ["-off", "--off"]:
     true
   else:
     false
@@ -36,6 +36,7 @@ proc main() =
     let ex = getCurrentException()
     echo ex.msg
     echo ex.getStackTrace()
+    quit 1
 
 when isMainModule:
   main()

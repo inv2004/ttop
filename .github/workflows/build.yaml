@@ -13,7 +13,7 @@ jobs:
       - run: sudo apt-get -y install musl-tools
       - uses: actions/checkout@v2
       - uses: jiro4989/setup-nim-action@v1
-      - run: nim --version && nimble -y install && nimble static
+      - run: nim --version && nimble -y install -d && nimble static
       - uses: ncipollo/release-action@v1
         with:
           artifacts: "ttop"

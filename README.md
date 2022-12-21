@@ -1,4 +1,4 @@
-# ttop - System monitor service with historical access
+# ttop - System monitor service with historical data
 
 ![image](https://user-images.githubusercontent.com/4949069/208906443-0c92eed7-a56c-4e1e-bc01-ec5be911eae9.png)
 

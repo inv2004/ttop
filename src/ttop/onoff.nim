@@ -7,9 +7,7 @@ const timer = "minutely"
 const unit = "ttop"
 const descr = "ttop service snapshot collector"
 
-const options = {poUsePath, poEchoCmd}
-
-
+const options = {poUsePath, poEchoCmd, poStdErrToStdOut}
 
 proc createService(file: string, app: string) =
   if fileExists file:
@@ -67,15 +65,17 @@ proc cmd(cmd: string) =
   if output.len > 0:
     echo output
   if code != 0:
-    quit code
+    raise newException(ValueError, "cmd error code")
 
 proc onoff*(enable: bool) =
   if enable:
     createConfig()
+    cmd "systemctl --user daemon-reload"
     cmd &"systemctl --user start '{unit}.timer' '{unit}.service'"
     cmd "loginctl enable-linger"
   else:
     cmd &"systemctl --user stop '{unit}.timer' '{unit}.service'"
     deleteConfig()
+    cmd "systemctl --user daemon-reload"
     cmd "loginctl disable-linger"
 

@@ -9,7 +9,7 @@
 
 ## Install
 ```bash
-cd ~/.local/bin/ && curl ...
+cd ~/.local/bin/ && curl ..
 ttop -on # to enable data collector
 ```
 

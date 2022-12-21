@@ -5,7 +5,7 @@
 - [x] TUI with critical values highlight
 - [x] Saving historical snapshots via systemd.timer
 - [x] Scroll via historical data
-- [x] Ascii graph of historical stats
+- [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 
 ## Install
 ```bash

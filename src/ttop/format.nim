@@ -74,6 +74,9 @@ proc formatT*(ts: int): string =
   let p = d.toParts()
   fmt"{p[Days]*24 + p[Hours]:2}:{p[Minutes]:02}:{p[Seconds]:02}"
 
+proc formatT*(ts: uint): string =
+  formatT(int(ts))
+
 when isMainModule:
   echo "|", 0.0.formatP, "|"
   echo "|", 5.2.formatP, "|"

@@ -60,6 +60,7 @@ proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
   if ii == -1:
     if result[1].len > 0:
       new(result[0])
+      # echo uncompress(buf)
       result[0][] = to[FullInfo](uncompress(buf))
     else:
       result[0] = fullInfo()
@@ -120,10 +121,15 @@ proc save*() =
   s.write buf.len.uint32
 
 when isMainModule:
-  let f = open("/tmp/1", fmAppend)
-  if flock(f.getFileHandle, 2 or 4) != 0:
-    echo "locked"
-  else:
-    sleep 2000
-    # echo flock(f.getFileHandle, 8)
+  var lastBlog = moveBlog(0, "", 0, 0)[0]
+  var (prev, _) = hist(-1, lastBlog)
+  let info = if prev == nil: fullInfo() else: fullInfo(prev)
+  info.pidsInfo.clear()
+  info.cpus.setLen 0
+  # info.disk.clear()
+  echo prev.disk["nvme0n1p5"].ioWrite
+  echo info.disk["nvme0n1p5"].ioWrite
+  echo info.disk["nvme0n1p5"].ioUsageWrite
+  echo info[]
+  let buf = compress($$info[])
 

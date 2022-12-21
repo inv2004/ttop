@@ -62,18 +62,20 @@ proc deleteConfig() =
   echo "delete ", file
   removeFile file
 
-proc onoff*(enable: bool) =
-  var output = ""
-  var code = 0
-  if enable:
-    createConfig()
-    let cmd = &"systemctl --user start '{unit}.timer' '{unit}.service'"
-    (output, code) = execCmdEx(cmd, options = options)
-  else:
-    let cmd = &"systemctl --user stop '{unit}.timer' '{unit}.service'"
-    (output, code) = execCmdEx(cmd, options = options)
-    deleteConfig()
-  echo output
+proc cmd(cmd: string) =
+  let (output, code) = execCmdEx(cmd, options = options)
+  if output.len > 0:
+    echo output
   if code != 0:
     quit code
+
+proc onoff*(enable: bool) =
+  if enable:
+    createConfig()
+    cmd &"systemctl --user start '{unit}.timer' '{unit}.service'"
+    cmd "loginctl enable-linger"
+  else:
+    cmd &"systemctl --user stop '{unit}.timer' '{unit}.service'"
+    deleteConfig()
+    cmd "loginctl disable-linger"
 

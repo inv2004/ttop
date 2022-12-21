@@ -12,6 +12,7 @@ import sequtils
 const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
 const SECTOR = 512
+var uhz = hz.uint
 
 type SortField* = enum
   Cpu, Mem, Io, Pid, Name
@@ -34,26 +35,26 @@ type PidInfo* = object
   state*: string
   vsize*: uint
   rss*: uint
-  cpuTime*: int
+  cpuTime*: uint
   cpu*: float
   mem*: float
   cmd*: string
-  uptimeHz*: int
-  uptime*: int
+  uptimeHz*: uint
+  uptime*: uint
   ioRead*, ioWrite*: uint
   ioReadDiff*, ioWriteDiff*: uint
   netIn*, netOut*: uint
   netInDiff*, netOutDiff*: uint
 
 type CpuInfo = object
-  total*: int
-  idle*: int
+  total*: uint
+  idle*: uint
   cpu*: float
 
 type SysInfo* = object
   datetime*: times.DateTime
   hostname*: string
-  uptimeHz*: int
+  uptimeHz*: uint
 
 type Disk = object
   avail*: uint
@@ -120,9 +121,13 @@ proc cut*(str: string, size: int, right: bool, scroll: int): string =
 proc cut*(i: int | uint, size: int, right: bool, scroll: int): string =
   cut($i, size, right, scroll)
 
-proc parseUptime(): int =
+proc checkedSub(a, b: uint): uint =
+  if a > b:
+    return a - b
+
+proc parseUptime(): uint =
   let line = readLines(PROCFS & "/uptime", 1)[0]
-  int float(hz) * line.split()[0].parseFloat()
+  uint(float(hz) * line.split()[0].parseFloat())
 
 proc parseSize(str: string): uint =
   let normStr = str.strip(true, false)
@@ -144,7 +149,7 @@ proc memInfo(): MemInfo =
     of "SwapFree": result.SwapFree = parseSize(parts[1])
   result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
-proc parseStat(pid: uint, uptimeHz: int, mem: MemInfo): PidInfo =
+proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   let file = PROCFS & "/" & $pid & "/stat"
   let stat = stat(file)
   result.uid = stat.st_uid
@@ -158,16 +163,16 @@ proc parseStat(pid: uint, uptimeHz: int, mem: MemInfo): PidInfo =
   result.state = parts[2]
   result.vsize = parts[22].parseUInt()
   result.rss = pageSize * parts[23].parseUInt()
-  result.uptimeHz = uptimeHz - parts[21].parseInt()
+  result.uptimeHz = uptimeHz - parts[21].parseUInt()
   # result.uptimeHz = parts[21].parseInt()
-  result.uptime = result.uptimeHz div hz
-  result.cpuTime = parts[13].parseInt() + parts[14].parseInt()
+  result.uptime = result.uptimeHz div uhz
+  result.cpuTime = parts[13].parseUInt() + parts[14].parseUInt()
   let prevCpuTime = prevInfo.pidsInfo.getOrDefault(pid).cpuTime
   let delta =
     if pid in prevInfo.pidsInfo:
-      result.uptimeHz - prevInfo.pidsInfo[pid].uptimeHz
+      checkedSub(result.uptimeHz, prevInfo.pidsInfo[pid].uptimeHz)
     elif prevInfo.sys != nil:
-      uptimeHz - prevInfo.sys.uptimeHz
+      checkedSub(uptimeHz, prevInfo.sys.uptimeHz)
     else:
       0
 
@@ -175,7 +180,7 @@ proc parseStat(pid: uint, uptimeHz: int, mem: MemInfo): PidInfo =
     if delta == 0:
       0.0
     else:
-      100 * (result.cpuTime - prevCpuTime) / delta
+      (100.0 * checkedSub(result.cpuTime, prevCpuTime).float) / delta.float
 
   result.mem = float(100 * result.rss) / float(mem.MemTotal)
 
@@ -186,12 +191,12 @@ proc parseIO(pid: uint): (uint, uint, uint, uint) =
     case parts[0]
     of "read_bytes":
       result[0] = parseUInt parts[1].strip()
-      result[2] = result[0] - prevInfo.pidsInfo.getOrDefault(pid).ioRead
+      result[2] = checkedSub(result[0], prevInfo.pidsInfo.getOrDefault(pid).ioRead)
     of "write_bytes":
       result[1] = parseUInt parts[1].strip()
-      result[3] = result[1] - prevInfo.pidsInfo.getOrDefault(pid).ioWrite
+      result[3] = checkedSub(result[1], prevInfo.pidsInfo.getOrDefault(pid).ioWrite)
 
-proc parsePid(pid: uint, uptimeHz: int, mem: MemInfo): PidInfo =
+proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   result = parseStat(pid, uptimeHz, mem)
   try:
     let io = parseIO(pid)
@@ -214,7 +219,7 @@ proc pids*(): seq[uint] =
       except ValueError:
         discard
 
-proc pidsInfo*(uptimeHz: int, memInfo: MemInfo): OrderedTableRef[uint, PidInfo] =
+proc pidsInfo*(uptimeHz: uint, memInfo: MemInfo): OrderedTableRef[uint, PidInfo] =
   result = newOrderedTable[uint, PidInfo]()
   for pid in pids():
     try:
@@ -234,18 +239,18 @@ proc parseStat(): (CpuInfo, seq[CpuInfo]) =
       var off = 1
       if parts[1] == "":
         off = 2
-      let all = parts[off..<off+8].map(parseInt)
+      let all = parts[off..<off+8].map(parseUInt)
       let total = all.foldl(a+b)
       let idle = all[3] + all[4]
       if off == 1:
-        let curTotal = total - prevInfo.cpus.getOrDefault(result[1].len).total
-        let curIdle = idle - prevInfo.cpus.getOrDefault(result[1].len).idle
-        let cpu = 100 * (curTotal - curIdle) / curTotal
+        let curTotal = checkedSub(total, prevInfo.cpus.getOrDefault(result[1].len).total)
+        let curIdle = checkedSub(idle, prevInfo.cpus.getOrDefault(result[1].len).idle)
+        let cpu = (100 * (curTotal - curIdle).float) / curTotal.float
         result[1].add CpuInfo(total: total, idle: idle, cpu: cpu)
       else:
-        let curTotal = total - prevInfo.cpu.total
-        let curIdle = idle - prevInfo.cpu.idle
-        let cpu = 100 * (curTotal - curIdle) / curTotal
+        let curTotal = checkedSub(total, prevInfo.cpu.total)
+        let curIdle = checkedSub(idle, prevInfo.cpu.idle)
+        let cpu = (100 * (curTotal - curIdle).float) / curTotal.float
         result[0] = CpuInfo(total: total, idle: idle, cpu: cpu)
 
 proc sysInfo*(): ref SysInfo =
@@ -274,17 +279,18 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
       result[name].io = io
       # result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(
       #     name).io) / float msPassed
-      result[name].ioUsage = io - prevInfo.disk.getOrDefault(name).io
+      result[name].ioUsage = checkedSub(io, prevInfo.disk.getOrDefault(name).io)
       let ioRead = SECTOR * parseUInt parts[6]
       result[name].ioRead = ioRead
       # result[name].ioUsageRead = 100 * float(ioRead -
       #     prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
-      result[name].ioUsageRead = ioRead - prevInfo.disk.getOrDefault(name).ioRead
+      result[name].ioUsageRead = checkedSub(ioRead, prevInfo.disk.getOrDefault(name).ioRead)
       let ioWrite = SECTOR * parseUInt parts[10]
       result[name].ioWrite = ioWrite
       # result[name].ioUsageWrite = 100 * float(ioWrite -
       #     prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
-      result[name].ioUsageWrite = ioWrite - prevInfo.disk.getOrDefault(name).ioWrite
+      result[name].ioUsageWrite = checkedSub(ioWrite,
+          prevInfo.disk.getOrDefault(name).ioWrite)
   return result
 
 proc netInfo(): OrderedTableRef[string, Net] =
@@ -299,9 +305,9 @@ proc netInfo(): OrderedTableRef[string, Net] =
       let netOut = parseUInt fields[8]
       result[name] = Net(
         netIn: netIn,
-        netInDiff: netIn - prevInfo.net.getOrDefault(name).netIn,
+        netInDiff: checkedSub(netIn, prevInfo.net.getOrDefault(name).netIn),
         netOut: netOut,
-        netOutDiff: netOut - prevInfo.net.getOrDefault(name).netOut
+        netOutDiff: checkedSub(netOut, prevInfo.net.getOrDefault(name).netOut)
       )
 
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =

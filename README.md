@@ -9,8 +9,9 @@
 
 ## Install
 ```bash
-cd ~/.local/bin/ && curl ..
-ttop -on # to enable data collector
+curl https://github.com/inv2004/ttop/releases/latest/download/ttop --create-dirs -o ~/.local/bin/ttop
+chmod +x ~/.local/bin/ttop
+ttop -on # to enable data collector in systemd
 ```
 
 ## Uninstall

@@ -8,9 +8,13 @@
 - [x] Ascii graph of historical stats
 
 ## Install
+```bash
 cd cd ~/.local/bin/ && curl ...
 ttop -on # to enable data collector
+```
 
 ## Uninstall
+```bash
 ttop -off
 rm ~/.local/bin/ttop
+```

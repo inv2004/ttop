@@ -212,11 +212,12 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
 
   info.sort(curSort)
 
-  if info.cpu.cpu >= cpuCoreLimit:
+  let alarm = info.cpu.cpu >= cpuCoreLimit
+  if alarm:
     tb.setForegroundColor(fgRed, true)
   else:
     tb.setForegroundColor(fgWhite, false)
-  tb.drawRect(0, 0, w-1, h-1)
+  tb.drawRect(0, 0, w-1, h-1, alarm)
 
   header(tb, info, hist, stats.len, blog)
   graph(tb, stats, curSort, hist, stats.len)

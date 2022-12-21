@@ -2,9 +2,9 @@
 
 ![image](https://user-images.githubusercontent.com/4949069/208906443-0c92eed7-a56c-4e1e-bc01-ec5be911eae9.png)
 
-- [x] TUI with critical values highlight
 - [x] Saving historical snapshots via systemd.timer
 - [x] Scroll via historical data
+- [x] TUI with critical values highlight
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 
 ## Install

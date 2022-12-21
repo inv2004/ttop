@@ -10,6 +10,7 @@ System monitor service with historical data
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 - [x] User-space only, doesn't require root permissions
 - [x] Static build
+- [ ] Docker-related info
 
 ## Install
 ```bash

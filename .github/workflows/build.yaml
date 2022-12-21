@@ -15,7 +15,7 @@ jobs:
       - uses: jiro4989/setup-nim-action@v1
         with:
           nim-version: ${{ matrix.nim }}
-      - run: nim --version && nimble -d:release build
+      - run: nim --version && nimble -y -d:release build
       - uses: ncipollo/release-action@v1
         with:
           artifacts: "ttop"

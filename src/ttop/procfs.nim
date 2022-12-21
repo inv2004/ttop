@@ -8,6 +8,7 @@ import nativesockets
 import times
 import tables
 import sequtils
+import strscans
 
 const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
@@ -161,27 +162,31 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   if not isNil userInfo:
     result.user = $(userInfo.pw_name)
   let line = readLines(file, 1)[0]
-  let parts = line.split()
-  result.pid = parts[0].parseUInt()
-  result.name = parts[1][1..^2]
-  result.state = parts[2]
-  result.vsize = parts[22].parseUInt()
-  result.rss = pageSize * parts[23].parseUInt()
-  result.uptimeHz = uptimeHz - parts[21].parseUInt()
-  # result.uptimeHz = parts[21].parseInt()
+
+  var pid, tmp, utime, stime, starttime, vsize, rss: int
+  if not scanf(line, "$i ($+) $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
+            pid, result.name, result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
+    tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, tmp, # 20
+    tmp, starttime, vsize, rss):
+      raise newException(ValueError, "cannot parse " & file)
+
+  result.pid = pid.uint
+  result.vsize = vsize.uint
+  result.rss = pageSize * rss.uint
+  result.uptimeHz = uptimeHz - starttime.uint
   result.uptime = result.uptimeHz div uhz
-  result.cpuTime = parts[13].parseUInt() + parts[14].parseUInt()
-  let prevCpuTime = prevInfo.pidsInfo.getOrDefault(pid).cpuTime
+  result.cpuTime = utime.uint + stime.uint
+
+  let prevCpuTime = prevInfo.pidsInfo.getOrDefault(result.pid).cpuTime
   let delta =
-    if pid in prevInfo.pidsInfo:
-      checkedSub(result.uptimeHz, prevInfo.pidsInfo[pid].uptimeHz)
+    if result.pid in prevInfo.pidsInfo:
+      checkedSub(result.uptimeHz, prevInfo.pidsInfo[result.pid].uptimeHz)
     elif prevInfo.sys != nil:
       checkedSub(uptimeHz, prevInfo.sys.uptimeHz)
     else:
       0
 
   result.cpu = checkedDiv(100 * checkedSub(result.cpuTime, prevCpuTime), delta)
-
   result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
@@ -340,5 +345,8 @@ proc sortFunc(sortOrder: SortField): auto =
 proc sort*(info: FullInfoRef, sortOrder = Pid) =
   if sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
+
+when isMainModule:
+  echo "fix stat"
 
 

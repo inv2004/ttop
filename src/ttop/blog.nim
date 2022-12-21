@@ -60,7 +60,6 @@ proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
   if ii == -1:
     if result[1].len > 0:
       new(result[0])
-      # echo uncompress(buf)
       result[0][] = to[FullInfo](uncompress(buf))
     else:
       result[0] = fullInfo()

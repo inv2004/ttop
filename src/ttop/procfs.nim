@@ -125,6 +125,10 @@ proc checkedSub(a, b: uint): uint =
   if a > b:
     return a - b
 
+proc checkedDiv(a, b: uint): float =
+  if b != 0:
+    return a.float / b.float
+
 proc parseUptime(): uint =
   let line = readLines(PROCFS & "/uptime", 1)[0]
   uint(float(hz) * line.split()[0].parseFloat())
@@ -176,13 +180,9 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     else:
       0
 
-  result.cpu =
-    if delta == 0:
-      0.0
-    else:
-      (100.0 * checkedSub(result.cpuTime, prevCpuTime).float) / delta.float
+  result.cpu = checkedDiv(100 * checkedSub(result.cpuTime, prevCpuTime), delta)
 
-  result.mem = float(100 * result.rss) / float(mem.MemTotal)
+  result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
   let file = PROCFS & "/" & $pid & "/io"
@@ -245,12 +245,12 @@ proc parseStat(): (CpuInfo, seq[CpuInfo]) =
       if off == 1:
         let curTotal = checkedSub(total, prevInfo.cpus.getOrDefault(result[1].len).total)
         let curIdle = checkedSub(idle, prevInfo.cpus.getOrDefault(result[1].len).idle)
-        let cpu = (100 * (curTotal - curIdle).float) / curTotal.float
+        let cpu = checkedDiv(100 * (curTotal - curIdle), curTotal)
         result[1].add CpuInfo(total: total, idle: idle, cpu: cpu)
       else:
         let curTotal = checkedSub(total, prevInfo.cpu.total)
         let curIdle = checkedSub(idle, prevInfo.cpu.idle)
-        let cpu = (100 * (curTotal - curIdle).float) / curTotal.float
+        let cpu = checkedDiv(100 * (curTotal - curIdle), curTotal)
         result[0] = CpuInfo(total: total, idle: idle, cpu: cpu)
 
 proc sysInfo*(): ref SysInfo =

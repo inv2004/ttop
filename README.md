@@ -9,8 +9,9 @@
 
 ## Install
 ```bash
-curl https://github.com/inv2004/ttop/releases/latest/download/ttop --create-dirs -o ~/.local/bin/ttop
-chmod +x ~/.local/bin/ttop
+wget https://github.com/inv2004/ttop/releases/latest/download/ttop
+chmod +x ttop
+mv ttop ~/.local/bin/
 ttop -on # to enable data collector in systemd
 ```
 

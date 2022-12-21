@@ -32,7 +32,7 @@ proc main() =
       save()
     else:
       run()
-  except:
+  except CatchableError:
     let ex = getCurrentException()
     echo ex.msg
     echo ex.getStackTrace()

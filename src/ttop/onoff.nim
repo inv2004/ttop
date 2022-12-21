@@ -37,7 +37,7 @@ proc createTimer(file: string, app: string) =
 Description={descr} timer
 
 [Timer]
-OnCalendar=minutely
+OnCalendar={timer}
 
 [Install]
 WantedBy=timers.target

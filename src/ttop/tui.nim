@@ -127,7 +127,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
 
   tb.write " ", HelpCol, "/", fgNone, " - filter "
   timeButtons(tb, cnt)
-  tb.write " ", HelpCol, "Q", fgNone, " - quit "
+  tb.write " ", HelpCol, "Esc,Q", fgNone, " - quit "
 
   # tb.setForegroundColor(fgBlack, true)
   let x = tb.getCursorXPos()
@@ -195,7 +195,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
 proc filter(tb: var TerminalBuffer, filter: string, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
-  tb.write " ", HelpCol, "Esc", fgNone, " - Back "
+  tb.write " ", HelpCol, "Esc,Ret", fgNone, " - Back "
   timeButtons(tb, cnt)
   tb.write " Filter: ", bgBlue, filter[
       1..^1], bgNone

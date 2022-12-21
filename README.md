@@ -7,13 +7,14 @@
 - [x] TUI with critical values highlight
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 - [x] user-space only, doesn't require root permissions
+- [x] static build
 
 ## Install
 ```bash
 wget https://github.com/inv2004/ttop/releases/latest/download/ttop
 chmod +x ttop
-mv ttop ~/.local/bin/
-ttop -on # to enable data collector in systemd
+mv ttop ~/.local/bin/   # add into PATH
+ttop -on                # to enable data collector in systemd
 ```
 
 ## Uninstall

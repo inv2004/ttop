@@ -10,7 +10,6 @@ import format
 import sequtils
 import blog
 import asciigraph
-import os
 
 proc exitProc() {.noconv.} =
   illwillDeinit()

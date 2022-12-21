@@ -8,8 +8,8 @@ System monitor service with historical data
 - [x] Scroll via historical data
 - [x] TUI with critical values highlight
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
-- [x] user-space only, doesn't require root permissions
-- [x] static build
+- [x] User-space only, doesn't require root permissions
+- [x] Static build
 
 ## Install
 ```bash

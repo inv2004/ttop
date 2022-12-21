@@ -13,8 +13,6 @@ jobs:
       - run: sudo apt install musl-tools
       - uses: actions/checkout@v2
       - uses: jiro4989/setup-nim-action@v1
-        with:
-          nim-version: ${{ matrix.nim }}
       - run: nim --version && nimble -y static
       - uses: ncipollo/release-action@v1
         with:

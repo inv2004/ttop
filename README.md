@@ -6,6 +6,7 @@
 - [x] Scroll via historical data
 - [x] TUI with critical values highlight
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
+- [x] user-space only, doesn't require root permissions
 
 ## Install
 ```bash

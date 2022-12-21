@@ -10,7 +10,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - run: sudo apt install musl-tools
+      - run: sudo apt-get -y install musl-tools
       - uses: actions/checkout@v2
       - uses: jiro4989/setup-nim-action@v1
       - run: nim --version && nimble -y static

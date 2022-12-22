@@ -106,9 +106,10 @@ proc graphData(stats: seq[StatV1], sort: SortField): seq[float] =
     else: return stats.mapIt(float(it.prc))
 
 proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cnt: int) =
+  tb.setCursorPos offset, tb.getCursorYPos()+1
   if stats.len == 0:
     return
-  var y = tb.getCursorYPos() + 2
+  var y = tb.getCursorYPos() + 1
   tb.setCursorPos offset, y
   let data = graphData(stats, sort)
   let w = terminalWidth()

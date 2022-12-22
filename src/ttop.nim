@@ -2,6 +2,8 @@ import ttop/tui
 import ttop/blog
 import ttop/onoff
 
+import tables
+
 import os
 
 proc isSave(): bool =
@@ -22,21 +24,32 @@ proc isDisable(): bool =
   else:
     false
 
-proc main() =
+proc run(save = false, on = false, off = false) =
   try:
-    if isEnable():
-      onoff(true)
-    elif isDisable():
-      onoff(false)
-    elif isSave():
-      save()
-    else:
-      run()
+    if on: onoff(true)
+    elif off: onoff(false)
+    elif save: save()
+    else: tui()
   except CatchableError:
     let ex = getCurrentException()
     echo ex.msg
     echo ex.getStackTrace()
     quit 1
 
+const Help = {
+    "save": "save snapshot",
+    "on": "enable system.timer collector",
+    "off": "disable collector"
+  }.toTable
+
+const Short = {
+    "save": 's',
+    "on": '\0',
+    "off": '\0'
+  }.toTable
+
 when isMainModule:
-  main()
+  import cligen
+
+  dispatch run, help = Help, short = Short
+

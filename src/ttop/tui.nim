@@ -250,7 +250,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
     help(tb, curSort, scrollX, scrollY, stats.len)
   tb.display()
 
-proc run*() =
+proc tui*() =
   init()
   illwillInit(fullscreen = true)
   defer:

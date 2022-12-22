@@ -9,7 +9,7 @@ System monitor service with historical data
 - [x] TUI with critical values highlight
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 - [x] User-space only, doesn't require root permissions
-- [x] Static build. *It is temporary contains debug syms for debug reasons* which increases bin size ~x2.5 times
+- [x] Static build
 - [ ] Docker-related info
 
 ## Install

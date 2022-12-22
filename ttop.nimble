@@ -1,7 +1,7 @@
 # Package
 
-version = "0.3.3"
-author = "alexander"
+version = "0.3.4"
+author = "inv2004"
 description = "Monitoring tool with historical snapshots"
 license = "MIT"
 srcDir = "src"

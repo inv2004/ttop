@@ -1,6 +1,6 @@
 # Package
 
-version = "0.3.2"
+version = "0.3.3"
 author = "alexander"
 description = "Monitoring tool with historical snapshots"
 license = "MIT"
@@ -17,4 +17,4 @@ requires "zippy"
 requires "asciigraph"
 
 task static, "build static release":
-  exec "nim -d:release --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop c src/ttop.nim"
+  exec "nim -d:release --stackTrace:on --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop c src/ttop.nim"

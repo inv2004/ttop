@@ -92,21 +92,23 @@ proc graphData(stats: seq[StatV1], sort: SortField): seq[float] =
 proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cnt: int) =
   if stats.len == 0:
     return
-  var y = 7
+  var y = tb.getCursorYPos() + 2
   tb.setCursorPos offset, y
   let data = graphData(stats, sort)
   let w = terminalWidth()
   let gLines = plot(data, width = w - 11, height = 4).split("\n")
   # height = 5 or 8
+  y += 5 - gLines.len
   for i, g in gLines:
     tb.setCursorPos offset-1, y+i
     tb.write g
   if hist > 0:
     let cc = if cnt > 2: cnt - 1 else: 1
     let x = ((hist-1) * (w-11-2)) div (cc)
-    tb.setCursorPos offset + 8 + x, 12
+    tb.setCursorPos offset + 8 + x, tb.getCursorYPos() + 1
     tb.write "^"
-
+  else:
+    tb.setCursorPos offset, tb.getCursorYPos() + 1
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
   if cnt > 0:
@@ -122,7 +124,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
       tb.write fgCyan, " ", $($x)[0], " - by ", $x, " ", fgNone
     else:
       tb.write " ", HelpCol, $($x)[0], fgNone, " - by ", $x, " "
-    tb.setCursorXPos 0+tb.getCursorXPos()
+    # tb.setCursorXPos 0+tb.getCursorXPos()
 
   tb.write " ", HelpCol, "/", fgNone, " - filter "
   timeButtons(tb, cnt)
@@ -147,7 +149,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
 proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
     filter: string, statsLen: int) =
-  var y = if statsLen > 0: 13 else: 7
+  var y = tb.getCursorYPos() + 1
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""",
       ' '.repeat(tb.width-63), bgNone)
   inc y

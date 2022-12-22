@@ -2,8 +2,8 @@ import osproc
 import os
 import strformat
 
-# const timer = "*-*-* *:*:08"
-const timer = "minutely"
+const timer = "*:0/10:08"
+# const timer = "minutely"
 const unit = "ttop"
 const descr = "ttop service snapshot collector"
 

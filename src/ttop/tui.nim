@@ -25,6 +25,12 @@ proc writeR(tb: var TerminalBuffer, s: string) =
     tb.setCursorXPos x
     tb.write(s)
 
+proc chunks[T](x: openArray[T], n: int): seq[seq[T]] =
+  var i = 0
+  while i < x.len:
+    result.add x[i..<min(i+n, x.len)]
+    i += n
+
 proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
     blog: string) =
   let mi = info.mem
@@ -59,8 +65,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
     tb.write bgRed
   tb.write fmt"    SWP: {formatS(mi.SwapTotal - mi.SwapFree, mi.SwapTotal)}", bgNone
 
-  let diskMatrix = distribute(info.disk.keys().toSeq(), max(1,
-      info.disk.len div 2), false)
+  let diskMatrix = chunks(info.disk.keys().toSeq(), 2)
   for i, diskRow in diskMatrix:
     tb.setCursorPos offset, 4+i
     if i == 0:
@@ -78,7 +83,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
     if v.netIn == 0 and v.netOut == 0:
       continue
     netKeys.add k
-  let netMatrix = distribute(netKeys, max(1, netKeys.len div 4), false)
+  let netMatrix = chunks(netKeys, 4)
   var y = tb.getCursorYPos()+1
   for i, netRow in netMatrix:
     tb.setCursorPos offset, y+i

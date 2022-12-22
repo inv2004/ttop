@@ -8,7 +8,7 @@ const Help = """
 Usage:
   run [optional-param]
 Options:
-  -h, --help     print this cligen-erated help
+  -h, --help     print this help
   -s, --save     save snapshot
   --on           enable system.timer collector
   --off          disable collector

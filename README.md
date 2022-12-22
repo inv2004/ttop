@@ -2,7 +2,7 @@
 
 System monitor service with historical data
 
-![image](https://user-images.githubusercontent.com/4949069/208906443-0c92eed7-a56c-4e1e-bc01-ec5be911eae9.png)
+![image](https://user-images.githubusercontent.com/4949069/209130620-80ae1624-6e8e-4f48-8d12-92412f472fb9.png)
 
 - [x] Saving historical snapshots via systemd.timer
 - [x] Scroll via historical data

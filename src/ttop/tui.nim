@@ -58,29 +58,40 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   if swpChk >= swpLimit:
     tb.write bgRed
   tb.write fmt"    SWP: {formatS(mi.SwapTotal - mi.SwapFree, mi.SwapTotal)}", bgNone
-  var i = 0
-  for _, disk in info.disk:
-    if i mod 2 == 0:
-      tb.setCursorPos offset, 4+(i div 2)
-      if i == 0:
-        tb.write styleDim, "DSK: ", styleBright
-      else:
-        tb.write "  "
-    if i > 0:
-      tb.write " | "
-    tb.write fgBlue, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
-    inc i
-  tb.setCursorPos(offset, tb.getCursorYPos + 1)
-  tb.write styleDim, "NET: ", styleBright
-  i = 0
-  for name, net in info.net:
-    if net.netIn == 0 or net.netOut == 0:
+
+  let diskMatrix = distribute(info.disk.keys().toSeq(), max(1,
+      info.disk.len div 2), false)
+  for i, diskRow in diskMatrix:
+    tb.setCursorPos offset, 4+i
+    if i == 0:
+      tb.write styleDim, "DSK: ", styleBright
+    else:
+      tb.write "     "
+    for i, k in diskRow:
+      if i > 0:
+        tb.write " | "
+      let disk = info.disk[k]
+      tb.write fgBlue, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
+
+  var netKeys = newSeq[string]()
+  for k, v in info.net:
+    if v.netIn == 0 and v.netOut == 0:
       continue
-    if i > 0:
-      tb.write " | "
-    tb.write fgMagenta, name, fgWhite, " ", formatS(net.netInDiff,
-        net.netOutDiff)
-    inc i
+    netKeys.add k
+  let netMatrix = distribute(netKeys, max(1, netKeys.len div 4), false)
+  var y = tb.getCursorYPos()+1
+  for i, netRow in netMatrix:
+    tb.setCursorPos offset, y+i
+    if i == 0:
+      tb.write styleDim, "NET: ", styleBright
+    else:
+      tb.write "     "
+    for i, k in netRow:
+      if i > 0:
+        tb.write " | "
+      let net = info.net[k]
+      tb.write fgMagenta, k, fgWhite, " ", formatS(net.netInDiff,
+          net.netOutDiff)
 
 proc graphData(stats: seq[StatV1], sort: SortField): seq[float] =
   case sort:

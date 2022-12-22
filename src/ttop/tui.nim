@@ -113,18 +113,22 @@ proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cn
   tb.setCursorPos offset, y
   let data = graphData(stats, sort)
   let w = terminalWidth()
-  let gLines = plot(data, width = w - 11, height = 4).split("\n")
-  # height = 5 or 8
-  y += 5 - gLines.len
-  for i, g in gLines:
-    tb.setCursorPos offset-1, y+i
-    tb.write g
-  if hist > 0:
-    let cc = if cnt > 2: cnt - 1 else: 1
-    let x = ((hist-1) * (w-11-2)) div (cc)
-    tb.setCursorPos offset + 8 + x, tb.getCursorYPos() + 1
-    tb.write "^"
-  else:
+  try:
+    let gLines = plot(data, width = w - 11, height = 4).split("\n")
+    # height = 5 or 8
+    y += 5 - gLines.len
+    for i, g in gLines:
+      tb.setCursorPos offset-1, y+i
+      tb.write g
+    if hist > 0:
+      let cc = if cnt > 2: cnt - 1 else: 1
+      let x = ((hist-1) * (w-11-2)) div (cc)
+      tb.setCursorPos offset + 8 + x, tb.getCursorYPos() + 1
+      tb.write "^"
+    else:
+      tb.setCursorPos offset, tb.getCursorYPos() + 1
+  except:
+    tb.write("error in graph")
     tb.setCursorPos offset, tb.getCursorYPos() + 1
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
@@ -249,6 +253,9 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
 proc run*() =
   init()
   illwillInit(fullscreen = true)
+  defer:
+    illwillDeinit()
+    showCursor()
   setControlCHook(exitProc)
   hideCursor()
   var draw = false
@@ -264,7 +271,7 @@ proc run*() =
     var key = getKey()
     if filter.len == 0:
       case key
-      of Key.Escape, Key.Q: exitProc()
+      of Key.Escape, Key.Q: return
       of Key.Space: draw = true
       of Key.Left:
         if scrollX > 0: dec scrollX

@@ -18,4 +18,8 @@ requires "asciigraph"
 requires "cligen"
 
 task static, "build static release":
-  exec "nim -d:release --stackTrace:on --lineTrace:on --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop c src/ttop.nim"
+  exec "nim -d:release --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop c src/ttop.nim"
+
+task staticdebug, "build static debug":
+  exec "nim -d:release --stackTrace:on --lineTrace:on --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop-debug c src/ttop.nim"
+

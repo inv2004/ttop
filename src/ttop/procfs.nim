@@ -46,6 +46,8 @@ type PidInfo* = object
   ioReadDiff*, ioWriteDiff*: uint
   netIn*, netOut*: uint
   netInDiff*, netOutDiff*: uint
+  children*: seq[uint]
+  threads*: seq[uint]
 
 type CpuInfo = object
   total*: uint
@@ -151,6 +153,17 @@ proc memInfo(): MemInfo =
     of "SwapFree": result.SwapFree = parseSize(parts[1])
   result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
+proc parseTasks(pid: uint): (seq[uint], seq[uint]) =
+  for t in walkDir(PROCFS / $pid / "task"):
+    let tid = parseUInt t[1].lastPathPart
+    if tid == pid:
+      for line in lines(t[1] / "children"):
+        if line.len > 0:
+          result[0] = line[0..^2].split().map(parseUInt)
+        break
+    else:
+      result[1].add tid
+
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   let file = PROCFS / $pid / "stat"
   let stat = stat(file)
@@ -185,6 +198,8 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
 
   result.cpu = checkedDiv(100 * checkedSub(result.cpuTime, prevCpuTime), delta)
   result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
+
+  (result.children, result.threads) = parseTasks(result.pid)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
   let file = PROCFS / $pid / "io"
@@ -330,7 +345,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result.net = netInfo()
   prevInfo = result
 
-proc sortFunc(sortOrder: SortField): auto =
+proc sortFunc(sortOrder: SortField, threads = false): auto =
   case sortOrder
   of Pid: return proc(a, b: (uint, PidInfo)): int =
     cmp a[1].pid, b[1].pid
@@ -348,6 +363,8 @@ proc sort*(info: FullInfoRef, sortOrder = Pid) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  echo "fix stat"
+  let info = fullInfo()
+  for k, v in info.pidsInfo:
+    echo k, ": ", v.children, " ", v.threads
 
 

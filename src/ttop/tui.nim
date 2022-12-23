@@ -137,7 +137,8 @@ proc timeButtons(tb: var TerminalBuffer, cnt: int) =
   else:
     tb.write " ", styleDim, "[],{} - timeshift ", styleBright, fgNone
 
-proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int) =
+proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
+    cnt: int, thr: bool) =
   tb.setCursorPos offset, tb.height - 1
 
   tb.write fgCyan, " order by"
@@ -150,9 +151,13 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
 
   tb.write "  ", HelpCol, "/", fgNone, " - filter "
   timeButtons(tb, cnt)
+  if thr:
+    tb.write " ", styleBright, fgNone, "T", fgNone, " - tree "
+  else:
+    tb.write " ", HelpCol, "T", fgNone, " - tree "
+
   tb.write " ", HelpCol, "Esc,Q", fgNone, " - quit "
 
-  # tb.setForegroundColor(fgBlack, true)
   let x = tb.getCursorXPos()
 
   let (w, h) = terminalSize()
@@ -170,10 +175,12 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int
 
 proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
-    filter: string, statsLen: int) =
+    filter: string, statsLen: int, thr: bool) =
   var y = tb.getCursorYPos() + 1
-  tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""",
-      ' '.repeat(tb.width-63), bgNone)
+  tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""")
+  if thr:
+    tb.write fmt""" {"THR":>3} """
+  tb.write ' '.repeat(tb.width-63), bgNone
   inc y
   var i: uint = 0
   for (_, p) in pi.pairs:
@@ -205,7 +212,13 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write " ", rwStr.cut(9, true, scrollX)
 
     tb.write " ", p.uptime.formatT().cut(8, false, scrollX)
-    let cmd = if p.cmd != "": p.cmd else: p.name
+    if thr:
+      tb.write " ", ($p.threads).cut(3, true, scrollX)
+    var cmd = if p.lvl > 0: repeat("⁃", p.lvl) else: ""
+    if p.cmd != "":
+      cmd.add p.cmd
+    else:
+      cmd.add p.name
     tb.write "  ", fgCyan, cmd.cut(tb.width - 65, false, scrollX), fgWhite
 
     inc y
@@ -225,7 +238,8 @@ proc filter(tb: var TerminalBuffer, filter: string, cnt: int) =
       1..^1], bgNone
 
 proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
-            filter: string, hist: int, stats: seq[StatV1], blog: string) =
+            filter: string, hist: int, stats: seq[StatV1], blog: string,
+                threads: bool) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
@@ -234,7 +248,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
     tb.display()
     return
 
-  info.sort(curSort)
+  info.sort(curSort, threads)
 
   let alarm = info.cpu.cpu >= cpuCoreLimit
   if alarm:
@@ -245,11 +259,11 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
 
   header(tb, info, hist, stats.len, blog)
   graph(tb, stats, curSort, hist, stats.len)
-  table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter, stats.len)
+  table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter, stats.len, threads)
   if filter.len > 0:
     filter(tb, filter, stats.len)
   else:
-    help(tb, curSort, scrollX, scrollY, stats.len)
+    help(tb, curSort, scrollX, scrollY, stats.len, threads)
   tb.display()
 
 proc tui*() =
@@ -265,8 +279,9 @@ proc tui*() =
   var curSort = Cpu
   var scrollX, scrollY = 0
   var filter = ""
+  var threads = false
   var (info, stats) = hist(hist, blog)
-  redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog)
+  redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog, threads)
 
   var refresh = 0
   while true:
@@ -297,6 +312,7 @@ proc tui*() =
       of Key.I: curSort = Io; draw = true
       of Key.N: curSort = Name; draw = true
       of Key.C: curSort = Cpu; draw = true
+      of Key.T: threads = not threads; draw = true
       of Key.Slash: filter = " "; draw = true
       of Key.LeftBracket:
         (blog, hist) = moveBlog(-1, blog, hist, stats.len)
@@ -349,7 +365,7 @@ proc tui*() =
       if hist == 0:
         blog = moveBlog(+1, blog, stats.len, stats.len)[0]
       (info, stats) = hist(hist, blog)
-      redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog)
+      redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog, threads)
       refresh = 0
       if draw:
         draw = false

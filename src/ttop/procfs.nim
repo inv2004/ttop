@@ -47,7 +47,9 @@ type PidInfo* = object
   netIn*, netOut*: uint
   netInDiff*, netOutDiff*: uint
   children*: seq[uint]
-  threads*: seq[uint]
+  threads*: int
+  lvl*: int
+  ord*: int
 
 type CpuInfo = object
   total*: uint
@@ -153,16 +155,20 @@ proc memInfo(): MemInfo =
     of "SwapFree": result.SwapFree = parseSize(parts[1])
   result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
-proc parseTasks(pid: uint): (seq[uint], seq[uint]) =
+proc parseTasks(pid: uint): (seq[uint], int) =
   for t in walkDir(PROCFS / $pid / "task"):
     let tid = parseUInt t[1].lastPathPart
     if tid == pid:
       for line in lines(t[1] / "children"):
         if line.len > 0:
-          result[0] = line[0..^2].split().map(parseUInt)
+          result[0].add line[0..^2].split().map(parseUInt)
         break
     else:
-      result[1].add tid
+      result[1].inc
+      for line in lines(t[1] / "children"):
+        if line.len > 0:
+          result[0].add line[0..^2].split().map(parseUInt)
+        break
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   let file = PROCFS / $pid / "stat"
@@ -358,13 +364,39 @@ proc sortFunc(sortOrder: SortField, threads = false): auto =
   of Cpu: return proc(a, b: (uint, PidInfo)): int =
     cmp b[1].cpu, a[1].cpu
 
-proc sort*(info: FullInfoRef, sortOrder = Pid) =
-  if sortOrder != Pid:
+proc mkTree(p: uint, pp: OrderedTableRef[uint, PidInfo], lvl, i: int,
+     sortOrder: SortField): int =
+
+  result = i
+
+  let o = newOrderedTable[uint, PidInfo]()
+  for c in pp[p].children:
+    o[c] = pp[c]
+
+  sort(o, sortFunc(sortOrder))
+
+  pp[p].lvl = lvl
+  pp[p].ord = result
+  inc result
+  for c in o.keys():
+    result = mkTree(c, pp, 1+lvl, result, sortOrder)
+    inc result
+
+proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
+  if threads:
+    var r = 0
+    for p, v in info.pidsInfo:
+      if v.ord == 0:
+        r = mkTree(p, info.pidsInfo, 0, r, sortOrder)
+    sort(info.pidsInfo, proc(a, b: (uint, PidInfo)): int =
+      cmp(a[1].ord, b[1].ord)
+    )
+  elif sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
   let info = fullInfo()
-  for k, v in info.pidsInfo:
-    echo k, ": ", v.children, " ", v.threads
-
+  sort(info, Mem, true)
+  for k, t in info.pidsInfo:
+    echo k, ": ", t.ord
 

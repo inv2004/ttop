@@ -371,7 +371,8 @@ proc mkTree(p: uint, pp: OrderedTableRef[uint, PidInfo], lvl, i: int,
 
   let o = newOrderedTable[uint, PidInfo]()
   for c in pp[p].children:
-    o[c] = pp[c]
+    if c in pp:
+      o[c] = pp[c]
 
   sort(o, sortFunc(sortOrder))
 

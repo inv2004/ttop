@@ -156,19 +156,13 @@ proc memInfo(): MemInfo =
   result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
 proc parseTasks(pid: uint): (seq[uint], int) =
-  for t in walkDir(PROCFS / $pid / "task"):
-    let tid = parseUInt t[1].lastPathPart
-    if tid == pid:
-      for line in lines(t[1] / "children"):
-        if line.len > 0:
-          result[0].add line[0..^2].split().map(parseUInt)
-        break
-    else:
-      result[1].inc
-      for line in lines(t[1] / "children"):
-        if line.len > 0:
-          result[0].add line[0..^2].split().map(parseUInt)
-        break
+  for c in walkFiles(PROCFS / $pid / "task/*/children"):
+    result[1].inc
+    for line in lines(c):
+      if line.len > 0:
+        result[0].add line[0..^2].split().map(parseUInt)
+      break
+  result[1].dec
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   let file = PROCFS / $pid / "stat"

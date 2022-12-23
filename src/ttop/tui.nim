@@ -140,14 +140,15 @@ proc timeButtons(tb: var TerminalBuffer, cnt: int) =
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
 
+  tb.write fgCyan, " order by"
   for x in SortField:
     if x == curSort:
-      tb.write fgCyan, " ", $($x)[0], " - by ", $x, " ", fgNone
+      tb.write " ", styleBright, fgNone, $x
     else:
-      tb.write " ", HelpCol, $($x)[0], fgNone, " - by ", $x, " "
+      tb.write " ", HelpCol, $($x)[0], fgCyan, ($x)[1..^1]
     # tb.setCursorXPos 0+tb.getCursorXPos()
 
-  tb.write " ", HelpCol, "/", fgNone, " - filter "
+  tb.write "  ", HelpCol, "/", fgNone, " - filter "
   timeButtons(tb, cnt)
   tb.write " ", HelpCol, "Esc,Q", fgNone, " - quit "
 

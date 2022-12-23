@@ -271,10 +271,8 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
       let name = parts[0]
       let path = parts[1]
       var stat: Statvfs
-      let code = statvfs(cstring path, stat)
-      if code != 0:
-        raise newException(ValueError, "cannot get statvfs of " & path &
-            " with error " & $code)
+      if statvfs(cstring path, stat) != 0:
+        continue
       result[name] = Disk(avail: stat.f_bfree * stat.f_bsize,
                           total: stat.f_blocks * stat.f_bsize,
                           path: path)

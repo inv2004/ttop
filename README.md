@@ -10,6 +10,7 @@ System monitoring service tool with tui and historical data
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 - [x] User-space only, doesn't require root permissions
 - [x] Static build
+- [x] Threads tree
 - [ ] Docker-related info
 
 ## Install

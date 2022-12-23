@@ -141,7 +141,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
     cnt: int, thr: bool) =
   tb.setCursorPos offset, tb.height - 1
 
-  tb.write fgCyan, " order by"
+  tb.write fgNone, " order by"
   for x in SortField:
     if x == curSort:
       tb.write " ", styleBright, fgNone, $x

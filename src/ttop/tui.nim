@@ -176,8 +176,9 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   inc y
   var i: uint = 0
   for (_, p) in pi.pairs:
-    if filter.len >= 2 and filter[1..^1] notin toLowerAscii(p.cmd):
-      continue
+    if filter.len >= 2:
+      if filter[1..^1] notin $p.pid and filter[1..^1] notin toLowerAscii(p.cmd):
+        continue
     if i < uint scrollY:
       inc i
       continue
@@ -317,6 +318,8 @@ proc tui*() =
       of Key.A .. Key.Z:
         filter.add toLowerAscii($key)
         draw = true
+      of Key.Zero .. Key.Nine:
+        filter.add char(key.int)
       of Key.Backspace:
         if filter.len >= 2:
           filter = filter[0..^2]

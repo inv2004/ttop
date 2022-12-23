@@ -17,11 +17,11 @@ System monitoring service tool with tui and historical data
 wget https://github.com/inv2004/ttop/releases/latest/download/ttop
 chmod +x ttop
 mv ttop ~/.local/bin/   # add into PATH
-ttop -on                # to enable data collector in systemd
+ttop --on                # to enable data collector in systemd
 ```
 
 ## Uninstall
 ```bash
-ttop -off
+ttop --off
 rm ~/.local/bin/ttop
 ```

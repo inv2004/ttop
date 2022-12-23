@@ -85,9 +85,6 @@ type FullInfo* = object
 
 type FullInfoRef* = ref FullInfo
 
-const MOUNT = "/proc/mounts"
-const DISKSTATS = "/proc/diskstats"
-
 proc newFullInfo(): FullInfoRef =
   new(result)
   result.pidsInfo = newOrderedTable[uint, procfs.PidInfo]()
@@ -131,7 +128,7 @@ proc checkedDiv(a, b: uint): float =
     return a.float / b.float
 
 proc parseUptime(): uint =
-  let line = readLines(PROCFS & "/uptime", 1)[0]
+  let line = readLines(PROCFS / "uptime", 1)[0]
   uint(float(hz) * line.split()[0].parseFloat())
 
 proc parseSize(str: string): uint =
@@ -142,7 +139,7 @@ proc parseSize(str: string): uint =
     parseUInt(normStr)
 
 proc memInfo(): MemInfo =
-  for line in lines(PROCFS & "/meminfo"):
+  for line in lines(PROCFS / "meminfo"):
     let parts = line.split(":", 1)
     case parts[0]
     of "MemTotal": result.MemTotal = parseSize(parts[1])
@@ -155,7 +152,7 @@ proc memInfo(): MemInfo =
   result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
-  let file = PROCFS & "/" & $pid & "/stat"
+  let file = PROCFS / $pid / "stat"
   let stat = stat(file)
   result.uid = stat.st_uid
   let userInfo = getpwuid(result.uid)
@@ -190,15 +187,17 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
-  let file = PROCFS & "/" & $pid & "/io"
+  let file = PROCFS / $pid / "io"
+  var name: string;
+  var val: int;
   for line in lines(file):
-    let parts = line.split(":", 1)
-    case parts[0]
+    doAssert scanf(line, "$w: $i", name, val)
+    case name
     of "read_bytes":
-      result[0] = parseUInt parts[1].strip()
+      result[0] = val.uint
       result[2] = checkedSub(result[0], prevInfo.pidsInfo.getOrDefault(pid).ioRead)
     of "write_bytes":
-      result[1] = parseUInt parts[1].strip()
+      result[1] = val.uint
       result[3] = checkedSub(result[1], prevInfo.pidsInfo.getOrDefault(pid).ioWrite)
 
 proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
@@ -211,7 +210,7 @@ proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     result.ioWriteDiff = io[3]
   except IOError:
     discard
-  for line in lines(PROCFS & "/" & $pid & "/cmdline"):
+  for line in lines(PROCFS / $pid / "cmdline"):
     result.cmd = line.replace('\0', ' ').strip(false, true, {'\0'})
     break
 
@@ -238,7 +237,7 @@ proc getOrDefault(s: seq[CpuInfo], i: int): CpuInfo =
     return s[i]
 
 proc parseStat(): (CpuInfo, seq[CpuInfo]) =
-  for line in lines(PROCFS & "/stat"):
+  for line in lines(PROCFS / "stat"):
     if line.startsWith("cpu"):
       let parts = line.split()
       var off = 1
@@ -266,16 +265,18 @@ proc sysInfo*(): ref SysInfo =
 
 proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
   result = newOrderedTable[string, Disk]()
-  for line in lines(MOUNT):
+  for line in lines(PROCFS / "mounts"):
     if line.startsWith("/dev/"):
       let parts = line.split(maxsplit = 2)
-      let name = parts[0][5..^1]
+      let name = parts[0]
+      let path = parts[1]
       var stat: Statvfs
-      assert 0 == statvfs(cstring parts[1], stat)
+      if statvfs(cstring path, stat) != 0:
+        raise newException(ValueError, "cannot get statvfs of " & path)
       result[name] = Disk(avail: stat.f_bfree * stat.f_bsize,
                           total: stat.f_blocks * stat.f_bsize,
-                          path: parts[1])
-  for line in lines(DISKSTATS):
+                          path: path)
+  for line in lines(PROCFS / "diskstats"):
     let parts = line.splitWhitespace()
     let name = parts[2]
     if name in result:
@@ -300,7 +301,7 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
 
 proc netInfo(): OrderedTableRef[string, Net] =
   result = newOrderedTable[string, Net]()
-  let file = PROCFS & "/net/dev"
+  let file = PROCFS / "net/dev"
   for line in lines(file):
     let parts = line.split(":", 1)
     if parts.len == 2:

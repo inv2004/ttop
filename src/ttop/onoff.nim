@@ -81,7 +81,7 @@ proc onoff*(enable: bool) =
 
 proc createPkgConfig() =
   let pkgBin = "/usr/bin/ttop"
-  let cfgDir = "etc/systemd/system"
+  let cfgDir = "usr/lib/systemd/system"
   createDir(cfgDir)
   createService(cfgDir / &"{unit}.service", pkgBin)
   createTimer(cfgDir / &"{unit}.timer", pkgBin)

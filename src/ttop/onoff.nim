@@ -79,3 +79,13 @@ proc onoff*(enable: bool) =
     cmd "systemctl --user daemon-reload"
     cmd "loginctl disable-linger"
 
+proc createPkgConfig() =
+  let pkgBin = "/usr/bin/ttop"
+  let cfgDir = "etc/systemd/system"
+  createDir(cfgDir)
+  createService(cfgDir / &"{unit}.service", pkgBin)
+  createTimer(cfgDir / &"{unit}.timer", pkgBin)
+
+when isMainModule:
+  createPkgConfig()
+

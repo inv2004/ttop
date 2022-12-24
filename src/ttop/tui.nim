@@ -214,7 +214,9 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write " ", p.uptime.formatT().cut(8, false, scrollX)
     if thr:
       tb.write " ", ($p.threads).cut(3, true, scrollX)
-    var cmd = if p.lvl > 0: repeat("⁃", p.lvl) else: ""
+    var cmd = ""
+    if p.lvl > 0:
+      cmd = repeat("·", p.lvl)
     if p.cmd != "":
       cmd.add p.cmd
     else:

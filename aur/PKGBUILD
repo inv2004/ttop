@@ -10,7 +10,6 @@ license=("MIT")
 makedepends=(
     "git"
     "nim"
-    "nimble"
 )
 provides=($pkgname)
 source=(

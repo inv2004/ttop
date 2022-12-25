@@ -7,8 +7,8 @@ on:
 
 jobs:
   build:
-    timeout-minutes: 10
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - run: sudo apt-get -y install musl-tools
       - uses: actions/checkout@v2
@@ -18,3 +18,19 @@ jobs:
         with:
           artifacts: "ttop,ttop-debug"
           makeLatest: true
+
+  aur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: build
+    if: contains(github.ref, 'refs/tags/v')
+    steps:
+      - run:
+      - uses: KSXGitHub/github-actions-deploy-aur@<TAG>
+        with:
+          pkgname: ttop
+          pkgbuild: aur/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update AUR package

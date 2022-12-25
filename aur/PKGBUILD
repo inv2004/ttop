@@ -16,7 +16,7 @@ source=(
     "git+"$url
 )
 sha256sums=("SKIP")
-install="${pkgname}.install"
+install=".INSTALL"
 
 pkgver() {
     cd "${srcdir}/${pkgname}"

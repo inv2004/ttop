@@ -25,7 +25,7 @@ jobs:
     needs: build
     if: contains(github.ref, 'refs/tags/v')
     steps:
-      - uses: KSXGitHub/github-actions-deploy-aur@<TAG>
+      - uses: KSXGitHub/github-actions-deploy-aur@v2
         with:
           pkgname: ttop
           pkgbuild: aur/PKGBUILD

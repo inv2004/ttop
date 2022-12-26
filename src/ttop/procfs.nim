@@ -109,11 +109,13 @@ proc cut*(str: string, size: int, right: bool, scroll: int): string =
     let max = min(size+scroll, str.high)
     if max >= str.high:
       str[^size..max]
-    else:
+    elif max - 1 > 0:
       if scroll > 0:
         "." & str[scroll+1..<max-1] & "."
       else:
         str[0..<max-1] & "."
+    else:
+      ""
   else:
     if right:
       ' '.repeat(size - l) & str

@@ -180,7 +180,8 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""")
   if thr:
     tb.write fmt""" {"THR":>3} """
-  tb.write ' '.repeat(tb.width-63), bgNone
+  if tb.width - 63 > 0:
+    tb.write ' '.repeat(tb.width-63), bgNone
   inc y
   var i: uint = 0
   for (_, p) in pi.pairs:

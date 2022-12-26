@@ -14,6 +14,14 @@ System monitoring service tool with tui and historical data
 - [ ] Docker-related info
 
 ## Install
+
+### Arch/AUR
+```bash
+yay -S ttop
+```
+
+### Download
+
 ```bash
 wget https://github.com/inv2004/ttop/releases/latest/download/ttop
 chmod +x ttop

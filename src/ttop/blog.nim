@@ -14,6 +14,8 @@ type StatV1* = object
   mem*: uint
   io*: uint
 
+const PKGDATA = "/var/lib/ttop"
+
 proc flock(fd: FileHandle, op: int): int {.header: "<sys/file.h>",
     importc: "flock".}
 
@@ -64,8 +66,14 @@ proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
     else:
       result[0] = fullInfo()
 
+proc getDataDir(): string =
+  if dirExists PKGDATA:
+    return PKGDATA
+  else:
+    getCacheDir("ttop")
+
 proc saveBlog(): string =
-  let dir = getCacheDir("ttop")
+  let dir = getDataDir()
   if not dirExists(dir):
     createDir(dir)
   os.joinPath(dir, now().format("yyyy-MM-dd")).addFileExt("blog")
@@ -77,7 +85,7 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
     return (b, hist-1)
   elif d > 0 and hist > 0 and hist < cnt:
     return (b, hist+1)
-  let dir = getCacheDir("ttop")
+  let dir = getDataDir()
   let files = sorted toSeq(walkFiles(os.joinPath(dir, "*.blog")))
   if d == 0 or b == "":
     if files.len > 0:

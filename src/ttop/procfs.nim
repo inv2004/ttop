@@ -177,12 +177,18 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     result.user = $(userInfo.pw_name)
   let buf = readFile(file)
 
-  var pid, tmp, utime, stime, starttime, vsize, rss, threads: int
-  if not scanf(buf, "$i ($+) $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
-            pid, result.name, result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
+  let cmdL = buf.find('(')
+  let cmdR = buf.rfind(')')
+
+  var pid: int
+  doAssert scanf(buf[0..<cmdL], "$i", pid)
+  result.name = buf[1+cmdL..<cmdR]
+
+  var tmp, utime, stime, starttime, vsize, rss, threads: int
+  doAssert scanf(buf[1+cmdR..^1], " $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
+            result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
     tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
-    tmp, starttime, vsize, rss):
-      raise newException(ValueError, "cannot parse " & file)
+    tmp, starttime, vsize, rss)
 
   result.name.escape()
   result.pid = pid.uint

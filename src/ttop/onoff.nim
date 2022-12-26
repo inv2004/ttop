@@ -60,15 +60,19 @@ proc deleteConfig() =
   echo "delete ", file
   removeFile file
 
-proc cmd(cmd: string) =
+proc cmd(cmd: string, check = false) =
   let (output, code) = execCmdEx(cmd, options = options)
   if output.len > 0:
     echo output
+    if check and output != "inactive":
+      let msg = "Looks like ttop.timer is already running system-wide"
+      raise newException(ValueError, "cmd error: " & msg)
   if code != 0:
     raise newException(ValueError, "cmd error code")
 
 proc onoff*(enable: bool) =
   if enable:
+    cmd &"systemctl check '{unit}.timer'", true
     createConfig()
     cmd "systemctl --user daemon-reload"
     cmd &"systemctl --user start '{unit}.timer'"

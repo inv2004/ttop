@@ -2,8 +2,8 @@ import osproc
 import os
 import strformat
 
-const timer = "*:0/10:08"
-# const timer = "minutely"
+# const timer = "*:0/10:08"
+const timer = "minutely"
 const unit = "ttop"
 const descr = "ttop service snapshot collector"
 
@@ -71,10 +71,10 @@ proc onoff*(enable: bool) =
   if enable:
     createConfig()
     cmd "systemctl --user daemon-reload"
-    cmd &"systemctl --user start '{unit}.timer' '{unit}.service'"
+    cmd &"systemctl --user start '{unit}.timer'"
     cmd "loginctl enable-linger"
   else:
-    cmd &"systemctl --user stop '{unit}.timer' '{unit}.service'"
+    cmd &"systemctl --user stop '{unit}.timer'"
     deleteConfig()
     cmd "systemctl --user daemon-reload"
     cmd "loginctl disable-linger"

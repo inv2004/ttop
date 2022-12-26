@@ -155,14 +155,12 @@ proc memInfo(): MemInfo =
     of "SwapFree": result.SwapFree = parseSize(parts[1])
   result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
-proc parseTasks(pid: uint): (seq[uint], int) =
+proc parseTasks(pid: uint): seq[uint] =
   for c in walkFiles(PROCFS / $pid / "task/*/children"):
-    result[1].inc
     for line in lines(c):
       if line.len > 0:
-        result[0].add line[0..^2].split().map(parseUInt)
+        result.add line[0..^2].split().map(parseUInt)
       break
-  result[1].dec
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   let file = PROCFS / $pid / "stat"
@@ -173,16 +171,17 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     result.user = $(userInfo.pw_name)
   let line = readLines(file, 1)[0]
 
-  var pid, tmp, utime, stime, starttime, vsize, rss: int
+  var pid, tmp, utime, stime, starttime, vsize, rss, threads: int
   if not scanf(line, "$i ($+) $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
             pid, result.name, result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
-    tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, tmp, # 20
+    tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
     tmp, starttime, vsize, rss):
       raise newException(ValueError, "cannot parse " & file)
 
   result.pid = pid.uint
   result.vsize = vsize.uint
   result.rss = pageSize * rss.uint
+  result.threads = threads
   result.uptimeHz = uptimeHz - starttime.uint
   result.uptime = result.uptimeHz div uhz
   result.cpuTime = utime.uint + stime.uint
@@ -199,7 +198,7 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   result.cpu = checkedDiv(100 * checkedSub(result.cpuTime, prevCpuTime), delta)
   result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
 
-  (result.children, result.threads) = parseTasks(result.pid)
+  result.children = parseTasks(result.pid)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
   let file = PROCFS / $pid / "io"
@@ -390,8 +389,9 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  let info = fullInfo()
-  sort(info, Mem, true)
-  for k, t in info.pidsInfo:
-    echo k, ": ", t.ord
+  # let info = fullInfo()
+  # sort(info, Mem, true)
+  # for k, t in info.pidsInfo:
+  #   echo k, ": ", t.ord
+  parseStat
 

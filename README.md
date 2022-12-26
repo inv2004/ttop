@@ -29,7 +29,7 @@ mv ttop ~/.local/bin/   # add into PATH
 ttop --on               # to enable data collector in systemd
 ```
 
-## Uninstall
+### Uninstall
 ```bash
 ttop --off
 rm ~/.local/bin/ttop

@@ -25,7 +25,9 @@ pkgver() {
 }
 
 prepare() {
-    true
+    cd "${srcdir}/${pkgname}"
+    VER=$(git tag | sort -V | tail -1)
+    git checkout "$VER"
 }
 
 build() {

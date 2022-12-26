@@ -123,6 +123,12 @@ proc cut*(str: string, size: int, right: bool, scroll: int): string =
 proc cut*(i: int | uint, size: int, right: bool, scroll: int): string =
   cut($i, size, right, scroll)
 
+proc escape(s: var string) =
+  for c in s.mitems():
+    case c
+    of '\0'..'\31', '\127': c = '?'
+    else: discard
+
 proc checkedSub(a, b: uint): uint =
   if a > b:
     return a - b
@@ -169,15 +175,16 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   let userInfo = getpwuid(result.uid)
   if not isNil userInfo:
     result.user = $(userInfo.pw_name)
-  let line = readLines(file, 1)[0]
+  let buf = readFile(file)
 
   var pid, tmp, utime, stime, starttime, vsize, rss, threads: int
-  if not scanf(line, "$i ($+) $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
+  if not scanf(buf, "$i ($+) $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
             pid, result.name, result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
     tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
     tmp, starttime, vsize, rss):
       raise newException(ValueError, "cannot parse " & file)
 
+  result.name.escape()
   result.pid = pid.uint
   result.vsize = vsize.uint
   result.rss = pageSize * rss.uint
@@ -224,9 +231,9 @@ proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     result.ioWriteDiff = io[3]
   except IOError:
     discard
-  for line in lines(PROCFS / $pid / "cmdline"):
-    result.cmd = line.replace('\0', ' ').strip(false, true, {'\0'})
-    break
+  let buf = readFile(PROCFS / $pid / "cmdline")
+  result.cmd = buf.strip(false, true, {'\0'}).replace('\0', ' ')
+  result.cmd.escape()
 
 proc pids*(): seq[uint] =
   for f in walkDir(PROCFS):
@@ -389,9 +396,7 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  # let info = fullInfo()
-  # sort(info, Mem, true)
-  # for k, t in info.pidsInfo:
-  #   echo k, ": ", t.ord
-  parseStat
-
+  let info = fullInfo()
+  sort(info, Mem, true)
+  for k, t in info.pidsInfo:
+    echo k, ": ", t.ord

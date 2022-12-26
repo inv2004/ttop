@@ -1,6 +1,6 @@
 # ttop
 
-System monitoring service tool with tui and historical data
+System monitoring tool with TUI and historical data service
 
 ![image](https://user-images.githubusercontent.com/4949069/209130620-80ae1624-6e8e-4f48-8d12-92412f472fb9.png)
 

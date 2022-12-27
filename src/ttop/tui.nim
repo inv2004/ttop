@@ -46,7 +46,8 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   else:
     tb.write fmt"    autoupdate    {blogShort}: {cnt}"
   let x = tb.getCursorYPos()
-  tb.write ' '.repeat(tb.width-71)
+  if tb.width - 71 > 0:
+    tb.write ' '.repeat(tb.width-71)
   tb.setCursorXPos x
   let procStr = fmt"PROCS: {$info.pidsInfo.len}"
   tb.writeR procStr

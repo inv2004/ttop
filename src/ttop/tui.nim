@@ -34,8 +34,9 @@ proc chunks[T](x: openArray[T], n: int): seq[seq[T]] =
 proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
     blog: string) =
   let mi = info.mem
-  tb.write(offset, 1, fgWhite)
-  tb.write fgBlue, info.sys.hostname, fgWhite, ": ", info.sys.datetime.format(
+  tb.setCursorPos offset, 1
+  tb.write bgCyan, info.sys.hostname, fgWhite, ": ",
+      info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
   let blogShort = extractFilename blog
   if hist > 0:
@@ -44,12 +45,17 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
     tb.write fmt"    autoupdate    log: empty"
   else:
     tb.write fmt"    autoupdate    {blogShort}: {cnt}"
-  tb.writeR fmt"PROCS: {$info.pidsInfo.len} "
+  let x = tb.getCursorYPos()
+  tb.write ' '.repeat(tb.width-71)
+  tb.setCursorXPos x
+  let procStr = fmt"PROCS: {$info.pidsInfo.len}"
+  tb.writeR procStr
+  tb.write bgNone
   tb.setCursorPos(offset, 2)
-  tb.write styleDim, "CPU: ", styleBright
+  tb.write fgYellow, "CPU: ", fgNone
   if info.cpu.cpu > cpuLimit:
     tb.write bgRed
-  tb.write info.cpu.cpu.formatP(true), bgNone, "  %|"
+  tb.write styleBright, info.cpu.cpu.formatP(true), bgNone, "  %|"
   tb.write info.cpus.mapIt(it.cpu.formatP).join("|")
   tb.write "|%"
   tb.setCursorPos(offset, 3)
@@ -58,7 +64,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   let memChk = 100 * float(mi.MemTotal - mi.MemFree) / float(mi.MemTotal)
   if memChk >= memLimit:
     tb.write bgRed
-  tb.write styleDim, "MEM: ", styleBright, memStr, bgNone
+  tb.write fgGreen, "MEM: ", fgNone, fgWhite, styleBright, memStr
   tb.write fmt"  {sign&abs(mi.MemDiff).formatS():>9}    BUF: {mi.Buffers.formatS()}    CACHE: {mi.Cached.formatS()}"
   let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
   if swpChk >= swpLimit:
@@ -69,14 +75,14 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   for i, diskRow in diskMatrix:
     tb.setCursorPos offset, 4+i
     if i == 0:
-      tb.write styleDim, "DSK: ", styleBright
+      tb.write fgCyan, "DSK: ", styleBright
     else:
       tb.write "     "
     for i, k in diskRow:
       if i > 0:
         tb.write " | "
       let disk = info.disk[k]
-      tb.write fgBlue, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
+      tb.write fgMagenta, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
 
   var netKeys = newSeq[string]()
   for k, v in info.net:
@@ -88,14 +94,14 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   for i, netRow in netMatrix:
     tb.setCursorPos offset, y+i
     if i == 0:
-      tb.write styleDim, "NET: ", styleBright
+      tb.write fgMagenta, "NET: ", styleBright
     else:
       tb.write "     "
     for i, k in netRow:
       if i > 0:
         tb.write " | "
       let net = info.net[k]
-      tb.write fgMagenta, k, fgWhite, " ", formatS(net.netInDiff,
+      tb.write fgCyan, k, fgWhite, " ", formatS(net.netInDiff,
           net.netOutDiff)
 
 proc graphData(stats: seq[StatV1], sort: SortField): seq[float] =

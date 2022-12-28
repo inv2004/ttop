@@ -17,7 +17,7 @@ System monitoring tool with TUI and historical data service
 
 ### Arch/AUR
 ```bash
-yay -S ttop
+yay -S ttop             # it enables systemd.timers automatically
 ```
 
 ### Static binary

@@ -1,6 +1,7 @@
 import osproc
 import os
 import strformat
+import strutils
 
 const timer = "*:0/10:08"
 # const timer = "minutely"
@@ -64,7 +65,7 @@ proc cmd(cmd: string, check = false) =
   let (output, code) = execCmdEx(cmd, options = options)
   if output.len > 0:
     echo output
-    if check and output != "inactive":
+    if check and output.splitLines()[0] != "inactive":
       let msg = "Looks like ttop.timer is already running system-wide"
       raise newException(ValueError, "cmd error: " & msg)
   if code != 0:

@@ -68,6 +68,8 @@ proc cmd(cmd: string, check = false) =
     if check and output.splitLines()[0] != "inactive":
       let msg = "Looks like ttop.timer is already running system-wide"
       raise newException(ValueError, "cmd error: " & msg)
+    else:
+      return
   if code != 0:
     raise newException(ValueError, "cmd error code")
 

@@ -147,6 +147,8 @@ proc parseSize(str: string): uint =
   let normStr = str.strip(true, false)
   if normStr.endsWith(" kB"):
     1024 * parseUInt(normStr[0..^4])
+  elif normStr.endsWith(" mB"):
+    1024 * 1024 * parseUInt(normStr[0..^4])
   else:
     parseUInt(normStr)
 

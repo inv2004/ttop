@@ -60,9 +60,10 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   tb.write info.cpus.mapIt(it.cpu.formatP).join("|")
   tb.write "|%"
   tb.setCursorPos(offset, 3)
-  let memStr = formatS(mi.MemTotal - mi.MemFree, mi.MemTotal)
+  let memUsed = mi.MemTotal - mi.MemAvailable
+  let memStr = formatS(memUsed, mi.MemTotal)
   let sign = if mi.MemDiff > 0: '+' elif mi.MemDiff == 0: '=' else: '-'
-  let memChk = 100 * float(mi.MemTotal - mi.MemFree) / float(mi.MemTotal)
+  let memChk = 100 * float(memUsed) / float(mi.MemTotal)
   if memChk >= memLimit:
     tb.write bgRed
   tb.write fgGreen, "MEM: ", fgNone, fgWhite, styleBright, memStr

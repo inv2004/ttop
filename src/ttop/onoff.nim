@@ -8,7 +8,7 @@ const timer = "*:0/10:08"
 const unit = "ttop"
 const descr = "ttop service snapshot collector"
 
-const cron = "*/10 * * * * ttop -s"
+const cron = "*/10 * * * *"
 
 const options = {poUsePath, poEchoCmd, poStdErrToStdOut}
 
@@ -93,7 +93,7 @@ proc onOffSystemd(enable: bool) =
 
 proc filter(input: string): string =
   for l in input.splitLines(true):
-    if "ttop" in l:
+    if unit in l:
       continue
     result.add l
 
@@ -101,7 +101,8 @@ proc onOffCron(enable: bool) =
   let output = cmd("crontab -l", true)
   var input = filter(output)
   if enable:
-    input &= cron & "\n"
+    let app = getAppFilename()
+    input &= &"{cron} {app} -s\n"
     discard cmd("crontab", false, input)
   else:
     if input == "":

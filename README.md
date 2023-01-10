@@ -27,7 +27,7 @@ yay -S ttop             # enables systemd.timers automatically
 wget https://github.com/inv2004/ttop/releases/latest/download/ttop
 chmod +x ttop
 mv ttop ~/bin/          # add into PATH if necessary
-ttop --on               # enable data collector in user's systemd.timers
+ttop --on               # enable data collector in user's systemd.timers or crontab
 ```
 
 ### Uninstall

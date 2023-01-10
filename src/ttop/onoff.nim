@@ -73,22 +73,25 @@ proc cmd(cmd: string, check = false, input = ""): string =
       if line0 == "active":
         let msg = "Looks like ttop.timer is already running system-wide"
         raise newException(ValueError, "cmd error: " & msg)
-      if line0.startsWith "no crontab for":
+      elif line0 == "inactive":
+        return ""
+      elif line0.startsWith "no crontab for":
         return ""
   if code != 0:
     raise newException(ValueError, "cmd error code: " & $code)
 
 proc onOffSystemd(enable: bool) =
+  let user = if isAdmin(): "" else: " --user"
   if enable:
-    discard cmd(&"systemctl check '{unit}.timer'", true)
+    discard cmd(&"systemctl is-active '{unit}.timer'", true)
     createConfig()
-    discard cmd "systemctl --user daemon-reload"
-    discard cmd &"systemctl --user start '{unit}.timer'"
+    discard cmd &"systemctl{user} daemon-reload"
+    discard cmd &"systemctl{user} start '{unit}.timer'"
     discard cmd "loginctl enable-linger"
   else:
-    discard cmd &"systemctl --user stop '{unit}.timer'"
+    discard cmd &"systemctl{user} stop '{unit}.timer'"
     deleteConfig()
-    discard cmd "systemctl --user daemon-reload"
+    discard cmd &"systemctl{user} daemon-reload"
     discard cmd "loginctl disable-linger"
 
 proc filter(input: string): string =
@@ -112,10 +115,16 @@ proc onOffCron(enable: bool) =
   discard cmd("crontab -l", true)
 
 proc onoff*(enable: bool) =
-  try:
-    discard cmd "systemctl is-active --quiet service"
+  let isSysD =
+    try:
+      discard cmd "systemctl is-active --quiet /"
+      true
+    except CatchableError:
+      false
+
+  if isSysD:
     onOffSystemd(enable)
-  except CatchableError:
+  else:
     echo "systemd failed, trying crontab"
     onOffCron(enable)
 

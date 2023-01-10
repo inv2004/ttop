@@ -232,14 +232,15 @@ proc parseIO(pid: uint): (uint, uint, uint, uint) =
       result[3] = checkedSub(result[1], prevInfo.pidsInfo.getOrDefault(pid).ioWrite)
 
 proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
-  result = parseStat(pid, uptimeHz, mem)
   try:
+    result = parseStat(pid, uptimeHz, mem)
     let io = parseIO(pid)
     result.ioRead = io[0]
     result.ioReadDiff = io[2]
     result.ioWrite = io[1]
     result.ioWriteDiff = io[3]
   except IOError:
+    result.cmd = "IOError"
     discard
   let buf = readFile(PROCFS / $pid / "cmdline")
   result.cmd = buf.strip(false, true, {'\0'}).replace('\0', ' ')

@@ -57,7 +57,13 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   if info.cpu.cpu > cpuLimit:
     tb.write bgRed
   tb.write styleBright, info.cpu.cpu.formatP(true), bgNone, "  %|"
-  tb.write info.cpus.mapIt(it.cpu.formatP).join("|")
+  for i, cpu in info.cpus:
+    if i > 0:
+      tb.write "|"
+    if cpu.cpu > cpuLimit:
+      tb.write fgYellow, formatP(cpu.cpu), fgNone, styleBright
+    else:
+      tb.write formatP(cpu.cpu)
   tb.write "|%"
   tb.setCursorPos(offset, 3)
   let memUsed = mi.MemTotal - mi.MemAvailable

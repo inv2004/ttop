@@ -32,7 +32,7 @@ prepare() {
 
 build() {
     cd "${srcdir}/${pkgname}"
-    nimble -d:release build
+    nimble -y -d:release build
     nim r src/ttop/onoff.nim
 }
 

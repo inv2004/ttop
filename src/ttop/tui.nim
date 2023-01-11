@@ -142,7 +142,7 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV1], blog: string, sort:
       let cc = if data.len > 2: data.len - 1 else: 1
       let x = ((hist-1) * (w-11-2)) div (cc)
       tb.setCursorPos offset + 8 + x, tb.getCursorYPos() + 1
-      tb.write styleBright, "^", styleDim
+      tb.write styleBright, "^"
     else:
       tb.setCursorPos offset, tb.getCursorYPos() + 1
       if stats.len == 0:
@@ -153,11 +153,11 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV1], blog: string, sort:
     tb.write("error in graph")
     tb.setCursorPos offset, tb.getCursorYPos() + 1
 
-proc timeButtons(tb: var TerminalBuffer, cnt: int) =
-  if cnt > 0:
-    tb.write " ", HelpCol, "[],{}", fgNone, " - timeshift "
-  else:
+proc timeButtons(tb: var TerminalBuffer, cnt: int, forceLive: bool) =
+  if forceLive or cnt == 0:
     tb.write " ", styleDim, "[],{} - timeshift ", styleBright, fgNone
+  else:
+    tb.write " ", HelpCol, "[],{}", fgNone, " - timeshift "
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
     cnt: int, thr, forceLive: bool) =
@@ -176,7 +176,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
   else:
     tb.write "  ", HelpCol, "T", fgNone, " - tree"
   tb.write "  ", HelpCol, "/", fgNone, " - filter "
-  timeButtons(tb, cnt)
+  timeButtons(tb, cnt, forceLive)
   if forceLive or cnt == 0:
     tb.write " ", styleBright, fgNone, "L", fgNone, " - live chart "
   else:
@@ -202,6 +202,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
     filter: string, statsLen: int, thr: bool) =
   var y = tb.getCursorYPos() + 1
+  tb.write styleBright
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""")
   if thr:
     tb.write fmt""" {"THR":>3} """
@@ -258,10 +259,10 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write ' '.repeat(tb.width-10)
     inc y
 
-proc filter(tb: var TerminalBuffer, filter: string, cnt: int) =
+proc filter(tb: var TerminalBuffer, filter: string, cnt: int, forceLive: bool) =
   tb.setCursorPos offset, tb.height - 1
   tb.write " ", HelpCol, "Esc,Ret", fgNone, " - Back "
-  timeButtons(tb, cnt)
+  timeButtons(tb, cnt, forceLive)
   tb.write " Filter: ", bgBlue, filter[
       1..^1], bgNone
 
@@ -290,7 +291,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   graph(tb, stats, live, blogShort, curSort, hist, forceLive)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter, stats.len, threads)
   if filter.len > 0:
-    filter(tb, filter, stats.len)
+    filter(tb, filter, stats.len, forceLive)
   else:
     help(tb, curSort, scrollX, scrollY, stats.len, threads, forceLive)
   tb.display()
@@ -348,17 +349,21 @@ proc tui*() =
       of Key.L: forceLive = not forceLive; draw = true
       of Key.Slash: filter = " "; draw = true
       of Key.LeftBracket:
-        (blog, hist) = moveBlog(-1, blog, hist, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(-1, blog, hist, stats.len)
+          draw = true
       of Key.RightBracket:
-        (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(+1, blog, hist, stats.len)
+          draw = true
       of Key.LeftBrace:
-        (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(-1, blog, 1, stats.len)
+          draw = true
       of Key.RightBrace:
-        (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
+          draw = true
       else: discard
     else:
       case key
@@ -381,17 +386,21 @@ proc tui*() =
         inc scrollX;
         draw = true
       of Key.LeftBracket:
-        (blog, hist) = moveBlog(-1, blog, hist, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(-1, blog, hist, stats.len)
+          draw = true
       of Key.RightBracket:
-        (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(+1, blog, hist, stats.len)
+          draw = true
       of Key.LeftBrace:
-        (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(-1, blog, 1, stats.len)
+          draw = true
       of Key.RightBrace:
-        (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-        draw = true
+        if not forceLive:
+          (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
+          draw = true
       else: discard
 
     if draw or refresh == 10:

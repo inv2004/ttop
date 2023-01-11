@@ -38,21 +38,20 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   tb.write bgCyan, info.sys.hostname, fgWhite, ": ",
       info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
-  let blogShort = extractFilename blog
   if hist > 0:
-    tb.write fmt"    {blogShort}: {hist} / {cnt}"
+    tb.write fmt"    {blog}: {hist} / {cnt}"
   elif blog == "":
     tb.write fmt"    autoupdate    log: empty"
   else:
-    tb.write fmt"    autoupdate    {blogShort}: {cnt}"
+    tb.write fmt"    autoupdate    {blog}: {cnt}"
   let x = tb.getCursorYPos()
   if tb.width - 71 > 0:
     tb.write ' '.repeat(tb.width-71)
   tb.setCursorXPos x
   let procStr = fmt"PROCS: {$info.pidsInfo.len}"
   tb.writeR procStr
-  tb.write bgNone
   tb.setCursorPos(offset, 2)
+  tb.write bgNone
   tb.write fgYellow, "CPU: ", fgNone
   if info.cpu.cpu > cpuLimit:
     tb.write bgRed
@@ -112,35 +111,44 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
       tb.write fgCyan, k, fgWhite, " ", formatS(net.netInDiff,
           net.netOutDiff)
 
-proc graphData(stats: seq[StatV1], sort: SortField): seq[float] =
+proc graphData(stats: seq[StatV1], sort: SortField, width: int): seq[float] =
   case sort:
-    of Cpu: return stats.mapIt(it.cpu)
-    of Mem: return stats.mapIt(int(it.mem).formatSPair()[0])
-    of Io: return stats.mapIt(float(it.io))
-    else: return stats.mapIt(float(it.prc))
+    of Cpu: result = stats.mapIt(it.cpu)
+    of Mem: result = stats.mapIt(int(it.mem).formatSPair()[0])
+    of Io: result = stats.mapIt(float(it.io))
+    else: result = stats.mapIt(float(it.prc))
 
-proc graph(tb: var TerminalBuffer, stats: seq[StatV1], sort: SortField, hist, cnt: int) =
+  if result.len < width:
+    let diff = width - stats.len
+    result.insert(float(0).repeat(diff), 0)
+
+proc graph(tb: var TerminalBuffer, stats, live: seq[StatV1], blog: string, sort: SortField,
+           hist: int, forceLive: bool) =
   tb.setCursorPos offset, tb.getCursorYPos()+1
-  if stats.len == 0:
-    return
   var y = tb.getCursorYPos() + 1
   tb.setCursorPos offset, y
-  let data = graphData(stats, sort)
   let w = terminalWidth()
+  let graphWidth = w - 12
+  let data =
+    if forceLive or stats.len == 0: graphData(live, sort, graphWidth)
+    else: graphData(stats, sort, 0)
   try:
-    let gLines = plot(data, width = w - 11, height = 4).split("\n")
-    # height = 5 or 8
+    let gLines = plot(data, width = graphWidth, height = 4).split("\n")
     y += 5 - gLines.len
     for i, g in gLines:
       tb.setCursorPos offset-1, y+i
       tb.write g
     if hist > 0:
-      let cc = if cnt > 2: cnt - 1 else: 1
+      let cc = if data.len > 2: data.len - 1 else: 1
       let x = ((hist-1) * (w-11-2)) div (cc)
       tb.setCursorPos offset + 8 + x, tb.getCursorYPos() + 1
-      tb.write "^"
+      tb.write styleBright, "^", styleDim
     else:
       tb.setCursorPos offset, tb.getCursorYPos() + 1
+      if stats.len == 0:
+        tb.writeR "No historical stats found"
+      else:
+        tb.writeR blog
   except:
     tb.write("error in graph")
     tb.setCursorPos offset, tb.getCursorYPos() + 1
@@ -152,7 +160,7 @@ proc timeButtons(tb: var TerminalBuffer, cnt: int) =
     tb.write " ", styleDim, "[],{} - timeshift ", styleBright, fgNone
 
 proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
-    cnt: int, thr: bool) =
+    cnt: int, thr, forceLive: bool) =
   tb.setCursorPos offset, tb.height - 1
 
   tb.write fgNone, " order by"
@@ -163,13 +171,16 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
       tb.write " ", HelpCol, $($x)[0], fgCyan, ($x)[1..^1]
     # tb.setCursorXPos 0+tb.getCursorXPos()
 
+  if thr:
+    tb.write "  ", styleBright, fgNone, "T", fgNone, " - tree"
+  else:
+    tb.write "  ", HelpCol, "T", fgNone, " - tree"
   tb.write "  ", HelpCol, "/", fgNone, " - filter "
   timeButtons(tb, cnt)
-  if thr:
-    tb.write " ", styleBright, fgNone, "T", fgNone, " - tree "
+  if forceLive or cnt == 0:
+    tb.write " ", styleBright, fgNone, "L", fgNone, " - live chart "
   else:
-    tb.write " ", HelpCol, "T", fgNone, " - tree "
-
+    tb.write " ", HelpCol, "L", fgNone, " - live chart "
   tb.write " ", HelpCol, "Esc,Q", fgNone, " - quit "
 
   let x = tb.getCursorXPos()
@@ -255,8 +266,8 @@ proc filter(tb: var TerminalBuffer, filter: string, cnt: int) =
       1..^1], bgNone
 
 proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
-            filter: string, hist: int, stats: seq[StatV1], blog: string,
-                threads: bool) =
+            filter: string, hist: int, stats, live: seq[StatV1], blog: string,
+                threads, forceLive: bool) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
@@ -274,13 +285,14 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
     tb.setForegroundColor(fgWhite, false)
   tb.drawRect(0, 0, w-1, h-1, alarm)
 
-  header(tb, info, hist, stats.len, blog)
-  graph(tb, stats, curSort, hist, stats.len)
+  let blogShort = extractFilename blog
+  header(tb, info, hist, stats.len, blogShort)
+  graph(tb, stats, live, blogShort, curSort, hist, forceLive)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter, stats.len, threads)
   if filter.len > 0:
     filter(tb, filter, stats.len)
   else:
-    help(tb, curSort, scrollX, scrollY, stats.len, threads)
+    help(tb, curSort, scrollX, scrollY, stats.len, threads, forceLive)
   tb.display()
 
 proc tui*() =
@@ -297,8 +309,11 @@ proc tui*() =
   var scrollX, scrollY = 0
   var filter = ""
   var threads = false
-  var (info, stats) = hist(hist, blog)
-  redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog, threads)
+  var forceLive = false
+  var live = newSeq[StatV1]()
+  var (info, stats) = hist(hist, blog, live)
+  redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
+      threads, forceLive)
 
   var refresh = 0
   while true:
@@ -330,6 +345,7 @@ proc tui*() =
       of Key.N: curSort = Name; draw = true
       of Key.C: curSort = Cpu; draw = true
       of Key.T: threads = not threads; draw = true
+      of Key.L: forceLive = true; draw = true
       of Key.Slash: filter = " "; draw = true
       of Key.LeftBracket:
         (blog, hist) = moveBlog(-1, blog, hist, stats.len)
@@ -381,9 +397,13 @@ proc tui*() =
     if draw or refresh == 10:
       if hist == 0:
         blog = moveBlog(+1, blog, stats.len, stats.len)[0]
-      (info, stats) = hist(hist, blog)
-      redraw(info, curSort, scrollX, scrollY, filter, hist, stats, blog, threads)
-      refresh = 0
+      if refresh == 10:
+        (info, stats) = hist(hist, blog, live)
+        refresh = 0
+      else:
+        (info, stats) = histNoLive(hist, blog)
+      redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
+          threads, forceLive)
       if draw:
         draw = false
       else:

@@ -19,17 +19,20 @@ const PKGDATA = "/var/log/ttop"
 proc flock(fd: FileHandle, op: int): int {.header: "<sys/file.h>",
     importc: "flock".}
 
-proc saveStat*(s: FileStream, f: FullInfoRef) =
+proc genStat(f: FullInfoRef): StatV1 =
   var io: uint = 0
   for _, disk in f.disk:
     io += disk.ioUsageRead + disk.ioUsageWrite
 
-  var stat = StatV1(
+  StatV1(
     prc: f.pidsInfo.len,
     cpu: f.cpu.cpu,
     mem: f.mem.MemTotal - f.mem.MemFree,
     io: io
   )
+
+proc saveStat*(s: FileStream, f: FullInfoRef) =
+  var stat = genStat(f)
 
   let sz = sizeof(StatV1)
   s.write sz.uint32
@@ -40,9 +43,13 @@ proc stat(s: FileStream): StatV1 =
   let rsz = s.readData(result.addr, sizeof(StatV1))
   doAssert sz == rsz
 
-proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
+proc hist*(ii: int, blog: string, live: var seq[StatV1]): (FullInfoRef, seq[StatV1]) =
   if ii == 0:
     result[0] = fullInfo()
+    live.add genStat result[0]
+  else:
+    live.add genStat(fullInfo())
+
   let s = newFileStream(blog)
   if s == nil:
     return
@@ -65,6 +72,10 @@ proc hist*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
       result[0][] = to[FullInfo](uncompress(buf))
     else:
       result[0] = fullInfo()
+
+proc histNoLive*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
+  var live = newSeq[StatV1]()
+  hist(ii, blog, live)
 
 proc getDataDir(): string =
   if dirExists PKGDATA:
@@ -96,7 +107,7 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
     let idx = files.find(b)
     if d < 0:
       if idx > 0:
-        return (files[idx-1], hist(-1, files[idx-1])[1].len)
+        return (files[idx-1], histNoLive(-1, files[idx-1])[1].len)
       else:
         return (b, 1)
     elif d > 0:
@@ -109,7 +120,7 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
 
 proc save*() =
   var lastBlog = moveBlog(0, "", 0, 0)[0]
-  var (prev, _) = hist(-1, lastBlog)
+  var (prev, _) = histNoLive(-1, lastBlog)
   let info = if prev == nil: fullInfo() else: fullInfo(prev)
   let buf = compress($$info[])
   let blog = saveBlog()

@@ -345,7 +345,7 @@ proc tui*() =
       of Key.N: curSort = Name; draw = true
       of Key.C: curSort = Cpu; draw = true
       of Key.T: threads = not threads; draw = true
-      of Key.L: forceLive = true; draw = true
+      of Key.L: forceLive = not forceLive; draw = true
       of Key.Slash: filter = " "; draw = true
       of Key.LeftBracket:
         (blog, hist) = moveBlog(-1, blog, hist, stats.len)

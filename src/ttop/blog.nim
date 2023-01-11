@@ -44,11 +44,14 @@ proc stat(s: FileStream): StatV1 =
   doAssert sz == rsz
 
 proc hist*(ii: int, blog: string, live: var seq[StatV1]): (FullInfoRef, seq[StatV1]) =
+  let fi = fullInfo()
   if ii == 0:
-    result[0] = fullInfo()
-    live.add genStat result[0]
+    result[0] = fi
+    live.add genStat(fi)
   else:
-    live.add genStat(fullInfo())
+    live.add genStat(fi)
+
+  live.delete((0..live.high - 1000))
 
   let s = newFileStream(blog)
   if s == nil:

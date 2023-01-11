@@ -27,7 +27,7 @@ proc genStat(f: FullInfoRef): StatV1 =
   StatV1(
     prc: f.pidsInfo.len,
     cpu: f.cpu.cpu,
-    mem: f.mem.MemTotal - f.mem.MemFree,
+    mem: f.mem.MemTotal - f.mem.MemAvailable,
     io: io
   )
 

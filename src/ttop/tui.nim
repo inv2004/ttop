@@ -19,8 +19,8 @@ proc exitProc() {.noconv.} =
 const offset = 2
 const HelpCol = fgGreen
 
-proc writeR(tb: var TerminalBuffer, s: string) =
-  let x = terminalWidth() - s.len - offset
+proc writeR(tb: var TerminalBuffer, s: string, rOffset = 0) =
+  let x = terminalWidth() - s.len - offset - rOffset
   if tb.getCursorXPos < x:
     tb.setCursorXPos x
     tb.write(s)
@@ -138,15 +138,19 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV1], blog: string, sort:
     for i, g in gLines:
       tb.setCursorPos offset-1, y+i
       tb.write g
-    if hist > 0:
+    if hist > 0 and not forceLive:
       let cc = if data.len > 2: data.len - 1 else: 1
       let x = ((hist-1) * (w-11-2)) div (cc)
       tb.setCursorPos offset + 8 + x, tb.getCursorYPos() + 1
       tb.write styleBright, "^"
     else:
       tb.setCursorPos offset, tb.getCursorYPos() + 1
-      if stats.len == 0:
-        tb.writeR "No historical stats found"
+      if stats.len == 0 or forceLive:
+        if stats.len == 0:
+          tb.writeR("No historical stats found ", 5)
+        tb.write bgGreen
+        tb.writeR "LIVE"
+        tb.write bgNone
       else:
         tb.writeR blog
   except:

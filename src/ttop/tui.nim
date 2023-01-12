@@ -355,19 +355,19 @@ proc tui*() =
       of Key.LeftBracket:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, hist, stats.len)
-          draw = true
+        draw = true
       of Key.RightBracket:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-          draw = true
+        draw = true
       of Key.LeftBrace:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-          draw = true
+        draw = true
       of Key.RightBrace:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-          draw = true
+        draw = true
       else: discard
     else:
       case key
@@ -392,19 +392,19 @@ proc tui*() =
       of Key.LeftBracket:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, hist, stats.len)
-          draw = true
+        draw = true
       of Key.RightBracket:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-          draw = true
+        draw = true
       of Key.LeftBrace:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-          draw = true
+        draw = true
       of Key.RightBrace:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-          draw = true
+        draw = true
       else: discard
 
     if draw or refresh == 10:

@@ -149,6 +149,8 @@ proc parseSize(str: string): uint =
     1024 * parseUInt(normStr[0..^4])
   elif normStr.endsWith(" mB"):
     1024 * 1024 * parseUInt(normStr[0..^4])
+  elif normStr.endsWith("B"):
+    raise newException(ValueError, "cannot parse: " & normStr)
   else:
     parseUInt(normStr)
 
@@ -407,7 +409,8 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  let info = fullInfo()
-  sort(info, Mem, true)
-  for k, t in info.pidsInfo:
-    echo k, ": ", t.ord
+  let s = "a:   100"
+  let fs = s.split(":", 1)
+  echo fs
+  echo parseSize(fs[1])
+

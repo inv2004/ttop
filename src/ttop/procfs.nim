@@ -171,7 +171,7 @@ proc parseTasks(pid: uint): seq[uint] =
   for c in walkFiles(PROCFS / $pid / "task/*/children"):
     for line in lines(c):
       if line.len > 0:
-        result.add line[0..^2].split().map(parseUInt)
+        result.add line.strip().split().map(parseUInt)
       break
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =

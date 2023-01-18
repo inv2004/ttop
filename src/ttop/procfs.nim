@@ -10,6 +10,7 @@ import times
 import tables
 import sequtils
 import strscans
+import options
 
 const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
@@ -80,9 +81,8 @@ type Net = object
   netOutDiff*: uint
 
 type Temp = object
-  enabled*: bool
-  cpu*: float64
-  ssd*: float64
+  cpu*: Option[float64]
+  nvme*: Option[float64]
 
 type FullInfo* = object
   sys*: ref SysInfo
@@ -367,9 +367,8 @@ proc netInfo(): OrderedTableRef[string, Net] =
 
 proc tempInfo(): Temp =
   if sensorsEnabled:
-    result.enabled = true
-    result.cpu = sensors.cpuTemp()
-    result.ssd = sensors.ssdTemp()
+    result.cpu = try: some(sensors.cpuTemp()) except KeyError, ValueError: none(float64)
+    result.nvme = try: some(sensors.nvmeTemp()) except KeyError, ValueError: none(float64)
 
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result = newFullInfo()

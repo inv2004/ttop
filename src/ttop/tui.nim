@@ -5,6 +5,7 @@ import strutils
 import strformat
 import tables
 import times
+import options
 import limits
 import format
 import sequtils
@@ -31,13 +32,13 @@ proc chunks[T](x: openArray[T], n: int): seq[seq[T]] =
     result.add x[i..<min(i+n, x.len)]
     i += n
 
-proc temp(tb: var TerminalBuffer, enabled: bool, value, limit: float64) =
-  if enabled:
-    if value > limit:
+proc temp(tb: var TerminalBuffer, value: Option[float64], limit: float64) =
+  if value.isSome:
+    if value.get > limit:
       tb.write bgRed
     else:
       tb.write fgBlue
-    tb.writeR formatC(value), -1
+    tb.writeR formatC(value.get), -1
     tb.write bgNone
 
 proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
@@ -73,7 +74,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
     else:
       tb.write formatP(cpu.cpu)
   tb.write "|%"
-  temp(tb, info.temp.enabled, info.temp.cpu, cpuLimit)
+  temp(tb, info.temp.cpu, cpuLimit)
   tb.setCursorPos(offset, 3)
   let memUsed = mi.MemTotal - mi.MemAvailable
   let memStr = formatS(memUsed, mi.MemTotal)
@@ -101,7 +102,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
       let disk = info.disk[k]
       tb.write fgMagenta, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
     if i == 0:
-      temp(tb, info.temp.enabled, info.temp.ssd, ssdTempLimit)
+      temp(tb, info.temp.nvme, ssdTempLimit)
 
   var netKeys = newSeq[string]()
   for k, v in info.net:

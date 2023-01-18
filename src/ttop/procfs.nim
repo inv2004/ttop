@@ -171,7 +171,7 @@ proc parseTasks(pid: uint): seq[uint] =
   for c in walkFiles(PROCFS / $pid / "task/*/children"):
     for line in lines(c):
       if line.len > 0:
-        result.add line.strip().split().map(parseUInt)
+        result.add line.strip(false, true, chars={' ', '\n', '\x00'}).split().map(parseUInt)
       break
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
@@ -409,8 +409,7 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  let s = "a:   100"
-  let fs = s.split(":", 1)
-  echo fs
-  echo parseSize(fs[1])
-
+  for line in lines("../failed_chld"):
+    if line.len > 0:
+      echo line.strip(false, true, chars={' ', '\n', '\x00'}).split().map(parseUInt)
+    break

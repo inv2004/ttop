@@ -8,6 +8,7 @@ System monitoring tool with TUI and historical data service
 - [x] Scroll via historical data
 - [x] TUI with critical values highlight
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
+- [x] Temperature via libsensors.so
 - [x] User-space only, doesn't require root permissions
 - [x] Static build
 - [x] Threads tree

@@ -37,7 +37,7 @@ proc temp(tb: var TerminalBuffer, value: Option[float64], limit: float64) =
     if value.get > limit:
       tb.write bgRed
     else:
-      tb.write fgBlue
+      tb.write fgBlue, styleBright
     tb.writeR formatC(value.get), -1
     tb.write bgNone
 

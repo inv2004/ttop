@@ -1,5 +1,6 @@
 import sys
 
+import sensors
 import os
 import strutils
 from posix import Uid, getpwuid
@@ -78,6 +79,11 @@ type Net = object
   netOut*: uint
   netOutDiff*: uint
 
+type Temp = object
+  enabled*: bool
+  cpu*: float64
+  ssd*: float64
+
 type FullInfo* = object
   sys*: ref SysInfo
   cpu*: CpuInfo
@@ -86,6 +92,7 @@ type FullInfo* = object
   pidsInfo*: OrderedTableRef[uint, procfs.PidInfo]
   disk*: OrderedTableRef[string, Disk]
   net*: OrderedTableRef[string, Net]
+  temp*: Temp
 
 type FullInfoRef* = ref FullInfo
 
@@ -98,6 +105,14 @@ proc newFullInfo(): FullInfoRef =
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef
 
 var prevInfo = newFullInfo()
+var sensorsEnabled = false
+
+proc initSensors*() =
+  try:
+    sensors.init()
+    sensorsEnabled = true
+  except LibraryError:
+    discard
 
 proc init*() =
   prevInfo = fullInfo()
@@ -350,6 +365,12 @@ proc netInfo(): OrderedTableRef[string, Net] =
         netOutDiff: checkedSub(netOut, prevInfo.net.getOrDefault(name).netOut)
       )
 
+proc tempInfo(): Temp =
+  if sensorsEnabled:
+    result.enabled = true
+    result.cpu = sensors.cpuTemp()
+    result.ssd = sensors.ssdTemp()
+
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result = newFullInfo()
 
@@ -362,6 +383,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result.pidsInfo = pidsInfo(result.sys.uptimeHz, result.mem)
   result.disk = diskInfo(result.sys.datetime)
   result.net = netInfo()
+  result.temp = tempInfo()
   prevInfo = result
 
 proc sortFunc(sortOrder: SortField, threads = false): auto =
@@ -409,7 +431,8 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  for line in lines("../failed_chld"):
-    if line.len > 0:
-      echo line.strip(false, true, chars={' ', '\n', '\x00'}).split().map(parseUInt)
-    break
+  let s = "a:   100"
+  let fs = s.split(":", 1)
+  echo fs
+  echo parseSize(fs[1])
+

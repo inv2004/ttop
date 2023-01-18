@@ -122,6 +122,7 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
       doAssert false
 
 proc save*() =
+  initSensors()
   var lastBlog = moveBlog(0, "", 0, 0)[0]
   var (prev, _) = histNoLive(-1, lastBlog)
   let info = if prev == nil: fullInfo() else: fullInfo(prev)

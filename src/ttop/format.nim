@@ -77,6 +77,9 @@ proc formatT*(ts: int): string =
 proc formatT*(ts: uint): string =
   formatT(int(ts))
 
+proc formatC*(temp: float64): string =
+  fmt"{temp.int}℃"
+
 when isMainModule:
   echo "|", 0.0.formatP, "|"
   echo "|", 5.2.formatP, "|"

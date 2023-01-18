@@ -2,7 +2,7 @@
 
 System monitoring tool with TUI and historical data service
 
-![image](https://user-images.githubusercontent.com/4949069/213152902-89124737-9f08-47ba-9184-f1d502920b18.png)
+![image](https://user-images.githubusercontent.com/4949069/213191967-ae9720ab-491c-4051-9eea-f5c7ce712e8d.png)
 
 - [x] Saving historical snapshots via systemd.timer or crontab
 - [x] Scroll via historical data

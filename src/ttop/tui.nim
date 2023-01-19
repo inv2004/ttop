@@ -167,7 +167,7 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV1], blog: string, sort:
       else:
         tb.writeR blog
   except:
-    tb.write("error in graph")
+    tb.write("error in graph: " & $deduplicate(data))
     tb.setCursorPos offset, tb.getCursorYPos() + 1
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int, forceLive: bool) =

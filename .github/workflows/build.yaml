@@ -16,7 +16,7 @@ jobs:
       - run: nim --version && nimble -y install -d && nimble static && nimble staticdebug && nimble dynamic
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "ttop,ttop-debug"
+          artifacts: "ttop,ttop-debug,ttop-dl"
           makeLatest: true
 
   aur:

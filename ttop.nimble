@@ -17,6 +17,9 @@ requires "zippy"
 requires "asciigraph"
 requires "sensors >= 0.2.3"
 
+task dynamic, "build dynamic release":
+  exec "nim -d:release -o:ttop-dl c src/ttop.nim"
+
 task static, "build static release":
   exec "nim -d:release --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop c src/ttop.nim"
 

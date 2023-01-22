@@ -369,6 +369,8 @@ proc tui*() =
       of Key.LeftBracket:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, hist, stats.len)
+        else:
+          forceLive = not forceLive
         draw = true
       of Key.RightBracket:
         if not forceLive:
@@ -406,6 +408,8 @@ proc tui*() =
       of Key.LeftBracket:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, hist, stats.len)
+        else:
+          forceLive = not forceLive
         draw = true
       of Key.RightBracket:
         if not forceLive:

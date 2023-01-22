@@ -186,7 +186,7 @@ proc parseTasks(pid: uint): seq[uint] =
   for c in walkFiles(PROCFS / $pid / "task/*/children"):
     for line in lines(c):
       if line.len > 0:
-        result.add line.strip(false, true, chars={' ', '\n', '\x00'}).split().map(parseUInt)
+        result.add line.strip(false, true, chars = {' ', '\n', '\x00'}).split().map(parseUInt)
       break
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
@@ -368,7 +368,8 @@ proc netInfo(): OrderedTableRef[string, Net] =
 proc tempInfo(): Temp =
   if sensorsEnabled:
     result.cpu = try: some(sensors.cpuTemp()) except KeyError, ValueError: none(float64)
-    result.nvme = try: some(sensors.nvmeTemp()) except KeyError, ValueError: none(float64)
+    result.nvme = try: some(sensors.nvmeTemp()) except KeyError,
+        ValueError: none(float64)
 
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result = newFullInfo()

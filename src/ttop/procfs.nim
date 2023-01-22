@@ -367,8 +367,8 @@ proc netInfo(): OrderedTableRef[string, Net] =
 
 proc tempInfo(): Temp =
   if sensorsEnabled:
-    result.cpu = try: some(sensors.cpuTemp()) except KeyError, ValueError: none(float64)
-    result.nvme = try: some(sensors.nvmeTemp()) except KeyError,
+    result.cpu = try: some(sensors.cpuMaxTemp()) except KeyError, ValueError: none(float64)
+    result.nvme = try: some(sensors.nvmeMaxTemp()) except KeyError,
         ValueError: none(float64)
 
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =

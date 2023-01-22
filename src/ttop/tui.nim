@@ -227,6 +227,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write ' '.repeat(tb.width-63), bgNone
   inc y
   var i: uint = 0
+  tb.write fgWhite
   for (_, p) in pi.pairs:
     if filter.len >= 2:
       if filter[1..^1] notin $p.pid and filter[1..^1] notin toLowerAscii(p.cmd):
@@ -235,7 +236,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       inc i
       continue
     tb.setCursorPos offset, y
-    tb.write p.state, fgWhite
+    tb.write p.state
     tb.write " ", p.pid.cut(6, true, scrollX)
     if p.user == "":
       tb.write " ", fgMagenta, int(p.uid).cut(8, false, scrollX), fgWhite

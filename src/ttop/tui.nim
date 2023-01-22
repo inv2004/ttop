@@ -299,9 +299,9 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   let alarm = info.cpu.cpu >= cpuCoreLimit
   if alarm:
     tb.setForegroundColor(fgRed, true)
+    tb.drawRect(0, 0, w-1, h-1, alarm)
   else:
     tb.setForegroundColor(fgWhite, false)
-  tb.drawRect(0, 0, w-1, h-1, alarm)
 
   let blogShort = extractFilename blog
   header(tb, info, hist, stats.len, blogShort)

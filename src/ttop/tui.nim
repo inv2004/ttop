@@ -49,15 +49,15 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
       info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
   if hist > 0:
-    tb.write fmt"    {blog}: {hist} / {cnt}"
+    tb.write fmt"    {blog}: {hist} / {cnt} "
   elif blog == "":
-    tb.write fmt"    autoupdate    log: empty"
+    tb.write fmt"    autoupdate    log: empty "
   else:
-    tb.write fmt"    autoupdate    {blog}: {cnt}"
-  let x = tb.getCursorYPos()
-  if tb.width - 71 > 0:
-    tb.write ' '.repeat(tb.width-71)
-  tb.setCursorXPos x
+    tb.write fmt"    autoupdate    {blog}: {cnt} "
+  let curX = tb.getCursorXPos()
+  if tb.width - curX - 2 > 0:
+    tb.write ' '.repeat(tb.width - curX - 2)
+  tb.setCursorXPos curX
   let procStr = fmt"PROCS: {$info.pidsInfo.len}"
   tb.writeR procStr
   tb.setCursorPos(offset, 2)

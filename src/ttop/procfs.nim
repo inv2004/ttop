@@ -111,7 +111,7 @@ proc initSensors*() =
   try:
     sensors.init()
     sensorsEnabled = true
-  except LibraryError:
+  except LibraryError, SensorsException:
     discard
 
 proc init*() =
@@ -367,7 +367,8 @@ proc netInfo(): OrderedTableRef[string, Net] =
 
 proc tempInfo(): Temp =
   if sensorsEnabled:
-    result.cpu = try: some(sensors.cpuMaxTemp()) except KeyError, ValueError: none(float64)
+    result.cpu = try: some(sensors.cpuMaxTemp()) except KeyError,
+        ValueError: none(float64)
     result.nvme = try: some(sensors.nvmeMaxTemp()) except KeyError,
         ValueError: none(float64)
 

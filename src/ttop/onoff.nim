@@ -44,17 +44,23 @@ OnCalendar={timer}
 WantedBy=timers.target
 """)
 
+proc getServiceDir(): string =
+  if isAdmin():
+    result = "/usr/lib/systemd/system"
+  else:
+    result = getConfigDir().joinPath("systemd", "user")
+    if not dirExists result:
+      createDir result
+
 proc createConfig() =
-  let dir = getConfigDir().joinPath("systemd", "user")
-  if not dirExists dir:
-    createDir dir
+  let dir = getServiceDir()
 
   let app = getAppFilename()
   createService(dir.joinPath(&"{unit}.service"), app)
   createTimer(dir.joinPath(&"{unit}.timer"), app)
 
 proc deleteConfig() =
-  let dir = getConfigDir().joinPath("systemd", "user")
+  let dir = getServiceDir()
 
   var file = dir.joinPath(&"{unit}.service")
   echo "delete ", file
@@ -83,7 +89,8 @@ proc cmd(cmd: string, check = false, input = ""): string =
 proc onOffSystemd(enable: bool) =
   let user = if isAdmin(): "" else: " --user"
   if enable:
-    discard cmd(&"systemctl is-active '{unit}.timer'", true)
+    if not isAdmin():
+      discard cmd(&"systemctl is-active '{unit}.timer'", true)
     createConfig()
     discard cmd &"systemctl{user} daemon-reload"
     discard cmd &"systemctl{user} enable '{unit}.timer'"
@@ -130,13 +137,14 @@ proc onoff*(enable: bool) =
     echo "systemd failed, trying crontab"
     onOffCron(enable)
 
-proc createPkgConfig() =
+proc createPkgConfig(root: bool) =
   let pkgBin = "/usr/bin/ttop"
-  let cfgDir = "usr/lib/systemd/system"
+  let cfgDir = (if root: "/" else: "") / "usr/lib/systemd/system"
+  echo cfgDir
   createDir(cfgDir)
   createService(cfgDir / &"{unit}.service", pkgBin)
   createTimer(cfgDir / &"{unit}.timer", pkgBin)
 
 when isMainModule:
-  createPkgConfig()
+  createPkgConfig(false)
 

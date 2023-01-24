@@ -11,9 +11,11 @@ import format
 import sequtils
 import blog
 import asciigraph
+from terminal import setCursorXPos
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
+  setCursorXPos(0)
   showCursor()
   quit(0)
 
@@ -318,9 +320,7 @@ proc tui*() =
   initSensors()
   init()
   illwillInit(fullscreen = true)
-  defer:
-    illwillDeinit()
-    showCursor()
+  defer: exitProc()
   setControlCHook(exitProc)
   hideCursor()
   var draw = false

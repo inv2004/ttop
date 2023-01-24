@@ -86,10 +86,12 @@ proc onOffSystemd(enable: bool) =
     discard cmd(&"systemctl is-active '{unit}.timer'", true)
     createConfig()
     discard cmd &"systemctl{user} daemon-reload"
+    discard cmd &"systemctl{user} enable '{unit}.timer'"
     discard cmd &"systemctl{user} start '{unit}.timer'"
     discard cmd "loginctl enable-linger"
   else:
     discard cmd &"systemctl{user} stop '{unit}.timer'"
+    discard cmd &"systemctl{user} disable '{unit}.timer'"
     deleteConfig()
     discard cmd &"systemctl{user} daemon-reload"
     discard cmd "loginctl disable-linger"

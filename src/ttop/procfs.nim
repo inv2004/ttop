@@ -53,7 +53,7 @@ type PidInfo* = object
   lvl*: int
   ord*: int
 
-type CpuInfo = object
+type CpuInfo* = object
   total*: uint
   idle*: uint
   cpu*: float
@@ -63,7 +63,7 @@ type SysInfo* = object
   hostname*: string
   uptimeHz*: uint
 
-type Disk = object
+type Disk* = object
   avail*: uint
   total*: uint
   io*: uint
@@ -80,7 +80,7 @@ type Net = object
   netOut*: uint
   netOutDiff*: uint
 
-type Temp = object
+type Temp* = object
   cpu*: Option[float64]
   nvme*: Option[float64]
 

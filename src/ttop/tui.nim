@@ -34,9 +34,9 @@ proc chunks[T](x: openArray[T], n: int): seq[seq[T]] =
     result.add x[i..<min(i+n, x.len)]
     i += n
 
-proc temp(tb: var TerminalBuffer, value: Option[float64], limit: float64) =
+proc temp(tb: var TerminalBuffer, value: Option[float64], isLimit: bool) =
   if value.isSome:
-    if value.get > limit:
+    if isLimit:
       tb.write bgRed
     else:
       tb.write fgBlue, styleBright
@@ -65,31 +65,28 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   tb.setCursorPos(offset, 2)
   tb.write bgNone
   tb.write fgYellow, "CPU: ", fgNone
-  if info.cpu.cpu > cpuLimit:
+  if checkCpuLimit(info.cpu):
     tb.write bgRed
   tb.write styleBright, info.cpu.cpu.formatP(true), bgNone, "  %|"
   for i, cpu in info.cpus:
     if i > 0:
       tb.write "|"
-    if cpu.cpu > cpuLimit:
+    if checkCpuLimit(cpu):
       tb.write fgYellow, formatP(cpu.cpu), fgNone, styleBright
     else:
       tb.write formatP(cpu.cpu)
   tb.write "|%"
-  temp(tb, info.temp.cpu, cpuLimit)
+  temp(tb, info.temp.cpu, checkCpuTempLimit(info.temp))
   tb.setCursorPos(offset, 3)
-  let memUsed = mi.MemTotal - mi.MemAvailable
-  let memStr = formatS(memUsed, mi.MemTotal)
+  let memStr = formatS(mi.MemAvailable, mi.MemTotal)
   let sign = if mi.MemDiff > 0: '+' elif mi.MemDiff == 0: '=' else: '-'
-  let memChk = 100 * float(memUsed) / float(mi.MemTotal)
-  if memChk >= memLimit:
+  if checkMemLimit(mi):
     tb.write bgRed
   tb.write fgGreen, "MEM: ", fgNone, fgWhite, styleBright, memStr
   tb.write fmt"  {sign&abs(mi.MemDiff).formatS():>9}    BUF: {mi.Buffers.formatS()}    CACHE: {mi.Cached.formatS()}"
-  let swpChk = 100 * float(mi.SwapTotal - mi.SwapFree) / float(mi.SwapTotal)
-  if swpChk >= swpLimit:
+  if checkSwpLimit(mi):
     tb.write bgRed
-  tb.write fmt"    SWP: {formatS(mi.SwapTotal - mi.SwapFree, mi.SwapTotal)}", bgNone
+  tb.write fmt"    SWP: {formatD(mi.SwapFree, mi.SwapTotal)}", bgNone
 
   let diskMatrix = chunks(info.disk.keys().toSeq(), 2)
   for i, diskRow in diskMatrix:
@@ -102,9 +99,12 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
       if i > 0:
         tb.write " | "
       let disk = info.disk[k]
-      tb.write fgMagenta, disk.path, fgWhite, fmt" {formatS(disk.total - disk.avail, disk.total)} (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
+      let bg = if checkDiskLimit(disk): bgRed else: bgNone
+      tb.write fgMagenta, disk.path, fgWhite, " ", bg,
+          fmt"{formatD(disk.avail, disk.total)}", bgNone,
+              fmt" (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
     if i == 0:
-      temp(tb, info.temp.nvme, ssdTempLimit)
+      temp(tb, info.temp.nvme, checkSsdTempLimit(info.temp))
 
   var netKeys = newSeq[string]()
   for k, v in info.net:
@@ -296,12 +296,11 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
 
   info.sort(curSort, threads)
 
-  let alarm = info.cpu.cpu >= cpuCoreLimit
-  if alarm:
+  if checkAnyLimit(info):
     tb.setForegroundColor(fgRed, true)
-    tb.drawRect(0, 0, w-1, h-1, alarm)
-  else:
-    tb.setForegroundColor(fgBlue, false)
+    tb.drawRect(0, 0, w-1, h-1, true)
+  # else:
+    # tb.setForegroundColor(fgBlue, false)
     # tb.drawRect(0, 0, w-1, h-1, alarm)
 
   let blogShort = extractFilename blog

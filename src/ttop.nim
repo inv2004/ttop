@@ -15,6 +15,7 @@ Options:
   --on           enable system.timer (or cron) collector every 10 minutes
   --on <number>  enable system.timer (or cron) collector every <number> minutes
   --off          disable collector
+  --checksmtp    send email (just to check configuration)
 """
 
 proc main() =
@@ -32,6 +33,8 @@ proc main() =
         onoff(true)
       of "--off":
         onoff(false)
+      of "--checksmtp":
+        smtpCheck()
       else:
         echo Help
         quit 1

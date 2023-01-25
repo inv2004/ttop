@@ -66,6 +66,9 @@ proc formatS*(a: uint): string =
 proc formatS*(a, b: uint, delim = " / "): string =
   formatS(int(a), int(b), delim)
 
+proc formatD*(a, b: uint, delim = " / "): string =
+  formatS(int(b-a), int(b), delim)
+
 proc formatSI*(a, b: uint, delim = "/"): string =
   formatSI(int(a), int(b), delim)
 

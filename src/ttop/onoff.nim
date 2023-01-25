@@ -15,12 +15,17 @@ proc createConfig(file: string) =
   echo "create ", file
   writeFile(file,
       &"""
-[data]
-path=/var/log/ttop
+# [data]
+# path=/var/log/ttop
 
-[smtp]
-user = "test@gmail.com"
-pass = "app-password"
+# [smtp]
+# host = smtp.gmail.com
+# user = gmail-user
+# pass = gmail-app-passcode
+# from = "from@gmail.com"
+# to = "to@gmail.com"
+# ssl = true
+# debug = false
 """)
 
 proc createService(file: string, app: string) =

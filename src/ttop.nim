@@ -1,6 +1,7 @@
 import ttop/tui
 import ttop/blog
 import ttop/onoff
+import ttop/smtp
 
 import strutils
 import os
@@ -26,7 +27,7 @@ proc main() =
       of "-h", "--help":
         echo Help
       of "-s", "--save":
-        discard save()
+        smtpSend save()
       of "--on":
         onoff(true)
       of "--off":

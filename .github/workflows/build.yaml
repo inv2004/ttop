@@ -18,6 +18,7 @@ jobs:
         with:
           artifacts: "ttop,ttop-debug"
           makeLatest: true
+          allowUpdates: true
 
   aur:
     runs-on: ubuntu-latest

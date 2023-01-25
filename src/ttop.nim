@@ -6,7 +6,11 @@ import ttop/alert
 import strutils
 import os
 
+const NimblePkgVersion {.strdefine.} = "Unknown"
+
 const Help = """
+ttop - system monitoring tool with TUI and historical data service
+
 Usage:
   run [optional-param]
 Options:
@@ -15,7 +19,8 @@ Options:
   --on           enable system.timer (or cron) collector every 10 minutes
   --on <number>  enable system.timer (or cron) collector every <number> minutes
   --off          disable collector
-  --checksmtp    send email (just to check configuration)
+  -v, --version  version number (""" & NimblePkgVersion & """)
+
 """
 
 proc main() =
@@ -33,6 +38,8 @@ proc main() =
         onoff(true)
       of "--off":
         onoff(false)
+      of "-v", "--version":
+        echo NimblePkgVersion
       else:
         echo Help
         quit 1

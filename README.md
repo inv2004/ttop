@@ -49,4 +49,4 @@ nimble -d:release build
 ### Notification
 * stmp support was removed in prev version by the reason that static binary with ssl is more that 3Mb
 
-At the moment `ttop` saves report files `alert.txt` (if any alert) or `info.txt` into data dir - `~/.cache/ttop/` or `/var/log/ttop` for root or Arch
+At the moment `ttop` saves report files `alert.txt` (if any alert) or `info.txt` into data dir - `~/.cache/ttop/` or `/var/log/ttop` (for root or Arch)

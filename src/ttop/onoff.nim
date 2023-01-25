@@ -1,4 +1,4 @@
-from blog import PKGDATA
+from config import PKGDATA
 import osproc
 import os
 import strformat
@@ -8,6 +8,20 @@ const unit = "ttop"
 const descr = "ttop service snapshot collector"
 
 const options = {poUsePath, poEchoCmd, poStdErrToStdOut}
+
+proc createConfig(file: string) =
+  if fileExists file:
+    return
+  echo "create ", file
+  writeFile(file,
+      &"""
+[data]
+path=/var/log/ttop
+
+[smtp]
+user = "test@gmail.com"
+pass = "app-password"
+""")
 
 proc createService(file: string, app: string) =
   if fileExists file:
@@ -58,6 +72,9 @@ proc createConfig(pkg: bool, interval: uint) =
 
   createService(dir.joinPath(&"{unit}.service"), app)
   createTimer(dir.joinPath(&"{unit}.timer"), app, interval)
+
+  if pkg:
+    createConfig("etc/ttop.conf")
 
 proc deleteConfig() =
   let dir = getServiceDir(false)

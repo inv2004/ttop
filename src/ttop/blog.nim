@@ -1,4 +1,6 @@
 import procfs
+import config
+
 import marshal
 import zippy
 import streams
@@ -13,8 +15,6 @@ type StatV1* = object
   cpu*: float
   mem*: uint
   io*: uint
-
-const PKGDATA* = "/var/log/ttop"
 
 proc flock(fd: FileHandle, op: int): int {.header: "<sys/file.h>",
     importc: "flock".}
@@ -80,14 +80,8 @@ proc histNoLive*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
   var live = newSeq[StatV1]()
   hist(ii, blog, live)
 
-proc getDataDir(): string =
-  if dirExists PKGDATA:
-    return PKGDATA
-  else:
-    getCacheDir("ttop")
-
 proc saveBlog(): string =
-  let dir = getDataDir()
+  let dir = getCfg().path
   if not dirExists(dir):
     createDir(dir)
   os.joinPath(dir, now().format("yyyy-MM-dd")).addFileExt("blog")
@@ -99,7 +93,7 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
     return (b, hist-1)
   elif d > 0 and hist > 0 and hist < cnt:
     return (b, hist+1)
-  let dir = getDataDir()
+  let dir = getCfg().path
   let files = sorted toSeq(walkFiles(os.joinPath(dir, "*.blog")))
   if d == 0 or b == "":
     if files.len > 0:

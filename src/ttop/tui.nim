@@ -272,6 +272,8 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
     inc y
     if y > tb.height-3:
+      tb.setCursorPos (tb.width div 2)-1, tb.getCursorYPos()+1
+      tb.write "..."
       break
 
 proc filter(tb: var TerminalBuffer, filter: string, cnt: int, forceLive: bool) =

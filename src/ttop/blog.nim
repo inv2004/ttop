@@ -16,34 +16,57 @@ type StatV1* = object
   mem*: uint
   io*: uint
 
+type StatV2* = object
+  prc*: int
+  cpu*: float
+  memTotal*: uint
+  memAvailable*: uint
+  io*: uint
+
+proc toStatV2(a: StatV1): StatV2 =
+  result.prc = a.prc
+  result.cpu = a.cpu
+  result.io = a.io
+
 proc flock(fd: FileHandle, op: int): int {.header: "<sys/file.h>",
     importc: "flock".}
 
-proc genStat(f: FullInfoRef): StatV1 =
+proc genStat(f: FullInfoRef): StatV2 =
   var io: uint = 0
   for _, disk in f.disk:
     io += disk.ioUsageRead + disk.ioUsageWrite
 
-  StatV1(
+  StatV2(
     prc: f.pidsInfo.len,
     cpu: f.cpu.cpu,
-    mem: f.mem.MemTotal - f.mem.MemAvailable,
+    memTotal: f.mem.MemTotal,
+    memAvailable: f.mem.MemAvailable,
     io: io
   )
 
 proc saveStat*(s: FileStream, f: FullInfoRef) =
   var stat = genStat(f)
 
-  let sz = sizeof(StatV1)
+  let sz = sizeof(StatV2)
   s.write sz.uint32
   s.writeData stat.addr, sz
 
-proc stat(s: FileStream): StatV1 =
+proc stat(s: FileStream): StatV2 =
   let sz = s.readUInt32().int
-  let rsz = s.readData(result.addr, sizeof(StatV1))
-  doAssert sz == rsz
+  var rsz: int
+  case sz
+  of sizeof(StatV2):
+    rsz = s.readData(result.addr, sizeof(StatV2))
+    doAssert sz == rsz
+  of sizeof(StatV1):
+    var sv1: StatV1
+    rsz = s.readData(sv1.addr, sizeof(StatV1))
+    doAssert sz == rsz
+    result = toStatV2 sv1
+  else:
+    discard
 
-proc hist*(ii: int, blog: string, live: var seq[StatV1]): (FullInfoRef, seq[StatV1]) =
+proc hist*(ii: int, blog: string, live: var seq[StatV2]): (FullInfoRef, seq[StatV2]) =
   let fi = fullInfo()
   if ii == 0:
     result[0] = fi
@@ -76,8 +99,8 @@ proc hist*(ii: int, blog: string, live: var seq[StatV1]): (FullInfoRef, seq[Stat
     else:
       result[0] = fullInfo()
 
-proc histNoLive*(ii: int, blog: string): (FullInfoRef, seq[StatV1]) =
-  var live = newSeq[StatV1]()
+proc histNoLive*(ii: int, blog: string): (FullInfoRef, seq[StatV2]) =
+  var live = newSeq[StatV2]()
   hist(ii, blog, live)
 
 proc saveBlog(): string =
@@ -115,12 +138,12 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
     else:
       doAssert false
 
-proc save*() =
+proc save*(): FullInfoRef =
   initSensors()
   var lastBlog = moveBlog(0, "", 0, 0)[0]
   var (prev, _) = histNoLive(-1, lastBlog)
-  let info = if prev == nil: fullInfo() else: fullInfo(prev)
-  let buf = compress($$info[])
+  result = if prev == nil: fullInfo() else: fullInfo(prev)
+  let buf = compress($$result[])
   let blog = saveBlog()
   let file = open(blog, fmAppend)
   if flock(file.getFileHandle, 2 or 4) != 0:
@@ -131,7 +154,8 @@ proc save*() =
   if s == nil:
     raise newException(IOError, "cannot open " & blog)
   defer: s.close()
-  s.saveStat info
+
+  s.saveStat result
   s.write buf.len.uint32
   s.write buf
   s.write buf.len.uint32

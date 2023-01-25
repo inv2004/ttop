@@ -126,10 +126,10 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
       tb.write fgCyan, k, fgWhite, " ", formatS(net.netInDiff,
           net.netOutDiff)
 
-proc graphData(stats: seq[StatV1], sort: SortField, width: int): seq[float] =
+proc graphData(stats: seq[StatV2], sort: SortField, width: int): seq[float] =
   case sort:
     of Cpu: result = stats.mapIt(it.cpu)
-    of Mem: result = stats.mapIt(int(it.mem).formatSPair()[0])
+    of Mem: result = stats.mapIt(int(it.memTotal - it.memAvailable).formatSPair()[0])
     of Io: result = stats.mapIt(float(it.io))
     else: result = stats.mapIt(float(it.prc))
 
@@ -137,7 +137,7 @@ proc graphData(stats: seq[StatV1], sort: SortField, width: int): seq[float] =
     let diff = width - stats.len
     result.insert(float(0).repeat(diff), 0)
 
-proc graph(tb: var TerminalBuffer, stats, live: seq[StatV1], blog: string, sort: SortField,
+proc graph(tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string, sort: SortField,
            hist: int, forceLive: bool) =
   tb.setCursorPos offset, tb.getCursorYPos()+1
   var y = tb.getCursorYPos() + 1
@@ -284,7 +284,7 @@ proc filter(tb: var TerminalBuffer, filter: string, cnt: int, forceLive: bool) =
       1..^1], bgNone
 
 proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
-            filter: string, hist: int, stats, live: seq[StatV1], blog: string,
+            filter: string, hist: int, stats, live: seq[StatV2], blog: string,
                 threads, forceLive: bool) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
@@ -328,7 +328,7 @@ proc tui*() =
   var filter = ""
   var threads = false
   var forceLive = false
-  var live = newSeq[StatV1]()
+  var live = newSeq[StatV2]()
   var (info, stats) = hist(hist, blog, live)
   redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
       threads, forceLive)

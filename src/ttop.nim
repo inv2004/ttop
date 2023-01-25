@@ -26,7 +26,7 @@ proc main() =
       of "-h", "--help":
         echo Help
       of "-s", "--save":
-        save()
+        discard save()
       of "--on":
         onoff(true)
       of "--off":

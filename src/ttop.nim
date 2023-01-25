@@ -2,6 +2,7 @@ import ttop/tui
 import ttop/blog
 import ttop/onoff
 
+import strutils
 import os
 
 const Help = """
@@ -10,7 +11,8 @@ Usage:
 Options:
   -h, --help     print this help
   -s, --save     save snapshot
-  --on           enable system.timer collector
+  --on           enable system.timer (or cron) collector every 10 minutes
+  --on <number>  enable system.timer (or cron) collector every <number> minutes
   --off          disable collector
 """
 
@@ -29,6 +31,12 @@ proc main() =
         onoff(true)
       of "--off":
         onoff(false)
+      else:
+        echo Help
+        quit 1
+    of 2:
+      if paramStr(1) == "--on":
+        onoff(true, parseUInt(paramStr(2)))
       else:
         echo Help
         quit 1

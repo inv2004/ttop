@@ -14,7 +14,7 @@ type StatV1* = object
   mem*: uint
   io*: uint
 
-const PKGDATA = "/var/log/ttop"
+const PKGDATA* = "/var/log/ttop"
 
 proc flock(fd: FileHandle, op: int): int {.header: "<sys/file.h>",
     importc: "flock".}

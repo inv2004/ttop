@@ -271,13 +271,8 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write "  ", fgCyan, cmd.cut(tb.width - 65, false, scrollX), fgWhite
 
     inc y
-    if y > tb.height-2:
+    if y > tb.height-3:
       break
-
-  while y <= tb.height-2:
-    tb.setCursorPos offset, y
-    tb.write ' '.repeat(tb.width-10)
-    inc y
 
 proc filter(tb: var TerminalBuffer, filter: string, cnt: int, forceLive: bool) =
   tb.setCursorPos offset, tb.height - 1
@@ -304,7 +299,8 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
     tb.setForegroundColor(fgRed, true)
     tb.drawRect(0, 0, w-1, h-1, alarm)
   else:
-    tb.setForegroundColor(fgWhite, false)
+    tb.setForegroundColor(fgBlue, false)
+    # tb.drawRect(0, 0, w-1, h-1, alarm)
 
   let blogShort = extractFilename blog
   header(tb, info, hist, stats.len, blogShort)

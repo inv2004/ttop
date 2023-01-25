@@ -1,6 +1,5 @@
 import parsecfg
 import os
-import strutils
 
 const cfgName = "ttop.conf"
 

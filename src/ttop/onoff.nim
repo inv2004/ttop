@@ -9,25 +9,6 @@ const descr = "ttop service snapshot collector"
 
 const options = {poUsePath, poEchoCmd, poStdErrToStdOut}
 
-proc createConfig(file: string) =
-  if fileExists file:
-    return
-  echo "create ", file
-  writeFile(file,
-      &"""
-# [data]
-# path=/var/log/ttop
-
-# [smtp]
-# host = smtp.gmail.com
-# user = gmail-user
-# pass = gmail-app-passcode
-# from = "from@gmail.com"
-# to = "to@gmail.com"
-# ssl = true
-# debug = false
-""")
-
 proc createService(file: string, app: string) =
   if fileExists file:
     return
@@ -61,10 +42,11 @@ WantedBy=timers.target
 """)
 
 proc getServiceDir(pkg: bool): string =
-  if isAdmin():
+  if pkg:
     result = "usr/lib/systemd/system"
-    if not pkg:
-      result = "/" / result
+    createDir result
+  elif isAdmin():
+    result = "/usr/lib/systemd/system"
   else:
     result = getConfigDir().joinPath("systemd", "user")
     if not dirExists result:
@@ -75,11 +57,10 @@ proc createConfig(pkg: bool, interval: uint) =
   let app = if pkg: "/usr/bin/ttop" else: getAppFilename()
   let dir = getServiceDir(pkg)
 
+  echo dir
+
   createService(dir.joinPath(&"{unit}.service"), app)
   createTimer(dir.joinPath(&"{unit}.timer"), app, interval)
-
-  if pkg:
-    createConfig("etc/ttop.conf")
 
 proc deleteConfig() =
   let dir = getServiceDir(false)
@@ -172,5 +153,5 @@ proc onoff*(enable: bool, interval: uint = 10) =
     onOffCron(enable, interval)
 
 when isMainModule:
-  createConfig(true)
+  createConfig(true, 10)
 

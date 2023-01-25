@@ -50,19 +50,19 @@ nimble -d:release build
 ### Configuration file example
 `$HOME/.config/ttop.conf` or `/etc/ttop.conf`
 ```ini
-# [data]
-# path=/var/log/ttop
+[data]
+path=/var/log/ttop
 # if path is not defined:
 #   if /var/log/ttop exists then uses it
 #   else it uses $HOME/.cache/ttop
 
-# [smtp]
-# host = smtp.gmail.com
+[smtp]
+host = smtp.gmail.com
 # if host is defined - email alerts are enabled, you can check configuration via "ttop --checksmtp"
-# user = gmail-user
-# pass = gmail-app-passcode
-# from = "from@gmail.com"
-# to = "to@gmail.com"
-# ssl = true
-# debug = false
+user = gmail-user
+pass = gmail-app-passcode
+from = "from@gmail.com"
+to = "to@gmail.com"
+ssl = true
+debug = false
 ```

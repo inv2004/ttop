@@ -29,12 +29,13 @@ proc loadConfig(): Config =
 proc initCfg*() =
   let config = loadConfig()
 
-  cfg = CfgRef(
-    path: config.getSectionValue("data", "path"),
-  )
+  let path =
+    if config == nil: getDataDir()
+    else: config.getSectionValue("data", "path")
 
-  if cfg.path == "":
-    cfg.path = getDataDir()
+  cfg = CfgRef(
+    path: path
+  )
 
 proc getCfg*(): CfgRef =
   if cfg == nil:

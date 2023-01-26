@@ -146,11 +146,11 @@ proc escape(s: var string) =
     of '\0'..'\31', '\127': c = '?'
     else: discard
 
-proc checkedSub(a, b: uint): uint =
+proc checkedSub*(a, b: uint): uint =
   if a > b:
     return a - b
 
-proc checkedDiv(a, b: uint): float =
+proc checkedDiv*(a, b: uint): float =
   if b != 0:
     return a.float / b.float
 

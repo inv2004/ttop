@@ -16,10 +16,10 @@ func checkCpuLimit*(c: CpuInfo): bool =
   c.cpu >= cpuLimit
 
 func checkMemLimit*(m: MemInfo): bool =
-  memLimit <= (100 * (m.MemTotal - m.MemAvailable)) div m.MemTotal
+  memLimit <= checkedDiv(100 * checkedSub(m.MemTotal, m.MemAvailable), m.MemTotal)
 
 func checkSwpLimit*(m: MemInfo): bool =
-  swpLimit <= (100 * (m.SwapTotal - m.SwapFree)) div m.SwapTotal
+  swpLimit <= checkedDiv(100 * checkedSub(m.SwapTotal, m.SwapFree), m.SwapTotal)
 
 func checkCpuTempLimit*(t: Temp): bool =
   if t.cpu.isSome:
@@ -30,7 +30,7 @@ func checkSsdTempLimit*(t: Temp): bool =
     return t.cpu.get >= ssdTempLimit
 
 func checkDiskLimit*(d: Disk): bool =
-  dskLimit <= (100 * (d.total - d.avail)) div d.total
+  dskLimit <= checkedDiv(100 * checkedSub(d.total, d.avail), d.total)
 
 func checkAnyDiskLimit(dd: OrderedTableRef[string, Disk]): bool =
   for _, d in dd:

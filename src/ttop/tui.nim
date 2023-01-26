@@ -173,7 +173,7 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string, sort:
     tb.setCursorPos offset, tb.getCursorYPos() + 1
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int, forceLive: bool) =
-  if forceLive or cnt == 0:
+  if cnt == 0:
     tb.write " ", styleDim, "[],{} - timeshift ", styleBright, fgNone
   else:
     tb.write " ", HelpCol, "[],{}", fgNone, " - timeshift "

@@ -57,8 +57,6 @@ proc createConfig(pkg: bool, interval: uint) =
   let app = if pkg: "/usr/bin/ttop" else: getAppFilename()
   let dir = getServiceDir(pkg)
 
-  echo dir
-
   createService(dir.joinPath(&"{unit}.service"), app)
   createTimer(dir.joinPath(&"{unit}.timer"), app, interval)
 

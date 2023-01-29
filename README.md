@@ -53,6 +53,7 @@ nimble -d:release build
 From v0.8.1 you can trigger extarnal tool, for example curl, to send notifications
 
 ### Config example
+`~/.config/ttop.toml` or `/etc/ttop.toml`
 ```toml
 # [data]
 # path = "/var/log/ttop"   # custom storage path (default = if exists /var/log/ttop, else ~/.cache/ttop )

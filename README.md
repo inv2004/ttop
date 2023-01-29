@@ -7,6 +7,7 @@ System monitoring tool with TUI and historical data service
 - [x] Saving historical snapshots via systemd.timer or crontab
 - [x] Scroll via historical data
 - [x] TUI with critical values highlight
+- [x] External triggers (for notifications or other needs)
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 - [x] Temperature via [libsensors](https://github.com/lm-sensors/lm-sensors/)
 - [x] User-space only, doesn't require root permissions

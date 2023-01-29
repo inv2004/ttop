@@ -60,6 +60,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   if tb.width - curX - 2 > 0:
     tb.write ' '.repeat(tb.width - curX - 2)
   tb.setCursorXPos curX
+  # let powerStr = fmt"{float(info.power) / 1000000:5.2f} W"
   let procStr = fmt"PROCS: {$info.pidsInfo.len}"
   tb.writeR procStr
   tb.setCursorPos(offset, 2)

@@ -93,6 +93,7 @@ type FullInfo* = object
   disk*: OrderedTableRef[string, Disk]
   net*: OrderedTableRef[string, Net]
   temp*: Temp
+  # power*: uint
 
 type FullInfoRef* = ref FullInfo
 
@@ -372,6 +373,12 @@ proc tempInfo(): Temp =
     result.nvme = try: some(sensors.nvmeMaxTemp()) except KeyError,
         ValueError: none(float64)
 
+
+# proc powerInfo(): uint =
+#   for f in walkFiles("/sys/class/power_supply/BAT*/power_now"):
+#     for line in lines(f):
+#       result += parseUInt(line)
+
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result = newFullInfo()
 
@@ -385,6 +392,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result.disk = diskInfo(result.sys.datetime)
   result.net = netInfo()
   result.temp = tempInfo()
+  # result.power = powerInfo()
   prevInfo = result
 
 proc sortFunc(sortOrder: SortField, threads = false): auto =

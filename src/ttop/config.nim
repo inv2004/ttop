@@ -1,13 +1,19 @@
-import parsecfg
+import parsetoml
 import os
 
-const cfgName = "ttop.conf"
+const cfgName = "ttop.toml"
 
 const PKGDATA* = "/var/log/ttop"
 
 type
+  Trigger* = object
+    onAlert*: bool
+    onInfo*: bool
+    debug*: bool
+    cmd*: string
   CfgRef* = ref object
     path*: string
+    triggers*: seq[Trigger]
 
 var cfg: CfgRef
 
@@ -17,25 +23,31 @@ proc getDataDir(): string =
   else:
     getCacheDir("ttop")
 
-proc loadConfig(): Config =
+proc loadConfig(): TomlValueRef =
   try:
-    return loadConfig(getConfigDir() / "ttop" / cfgName)
+    return parseFile(getConfigDir() / "ttop" / cfgName)
   except IOError:
     try:
-      return loadConfig("/etc" / cfgName)
+      return parseFile("/etc" / cfgName)
     except IOError:
       discard
 
 proc initCfg*() =
-  let config = loadConfig()
-
-  let path =
-    if config == nil: getDataDir()
-    else: config.getSectionValue("data", "path")
+  let toml = loadConfig()
 
   cfg = CfgRef(
-    path: path
+    path: toml{"data", "path"}.getStr(getDataDir())
   )
+
+  for t in toml{"trigger"}.getElems():
+    let onInfo = t{"on_info"}.getBool()
+    let onAlert = t{"on_alert"}.getBool(not onInfo)
+    cfg.triggers.add Trigger(
+      onAlert: onAlert,
+      onInfo: onInfo,
+      debug: t{"debug"}.getBool(),
+      cmd: t{"cmd"}.getStr()
+    )
 
 proc getCfg*(): CfgRef =
   if cfg == nil:

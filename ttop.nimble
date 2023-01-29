@@ -1,6 +1,6 @@
 # Package
 
-version = "0.7.2"
+version = "0.8.1"
 author = "inv2004"
 description = "Monitoring tool with historical snapshots and alerts"
 license = "MIT"
@@ -15,6 +15,7 @@ requires "illwill"
 requires "zippy"
 requires "asciigraph"
 requires "sensors >= 0.2.3"
+requires "parsetoml"
 
 const lmDir = "lm-sensors"
 

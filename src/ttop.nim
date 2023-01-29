@@ -1,7 +1,7 @@
 import ttop/tui
 import ttop/blog
 import ttop/onoff
-import ttop/alert
+import ttop/triggers
 
 import strutils
 import os

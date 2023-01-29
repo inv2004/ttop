@@ -9,6 +9,51 @@ const descr = "ttop service snapshot collector"
 
 const options = {poUsePath, poEchoCmd, poStdErrToStdOut}
 
+proc createToml(file: string) =
+  if fileExists file:
+    return
+  echo "create ", file
+  writeFile(file,
+      """
+# [data]
+# path = "/var/log/ttop"   # custom storage path (default = if exists /var/log/ttop, else ~/.cache/ttop )
+
+# [[trigger]]              # telegram example
+# on_alert = true          # execute trigger on alert (true if no other on_* provided)
+# on_info = true           # execute trigger on without alert (default = false)
+# debug = false            # output stdout/err from cmd (default = false)
+# cmd = '''
+# read -d '' TEXT
+# curl -X POST \
+#   -H 'Content-Type: application/json' \
+#   -d "{\"chat_id\": $CHAT_ID, \"text\": \"$TEXT\", \"disable_notification\": $TTOP_INFO}" \
+#   https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage
+# '''
+
+# # cmd receives text from stdin. The following env vars are set:
+# #   TTOP_ALERT (true|false) - if alert
+# #   TTOP_INFO (true|false)  - opposite to alert
+# #   TTOP_TYPE (alert|info)    - trigger type
+# #   TTOP_HOST               - host name
+# # you can find your CHAT_ID by send smth to your bot and run:
+# #    curl https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getUpdates
+
+# [[trigger]]               # smtp example
+# cmd = '''
+# read -d '' TEXT
+# TEXT="Subject: ttop $TTOP_TYPE from $TTOP_HOST
+#
+# $TEXT"
+# echo "$TEXT" | curl --ssl-reqd \
+#   --url 'smtps://smtp.gmail.com:465' \
+#   --user 'login:password' \
+#   --mail-from 'from@gmail.com' \
+#   --mail-rcpt 'to@gmail.com' \
+#   --upload-file -
+# '''
+
+""")
+
 proc createService(file: string, app: string) =
   if fileExists file:
     return
@@ -59,6 +104,10 @@ proc createConfig(pkg: bool, interval: uint) =
 
   createService(dir.joinPath(&"{unit}.service"), app)
   createTimer(dir.joinPath(&"{unit}.timer"), app, interval)
+
+  if pkg:
+    createDir "etc"
+    createToml("etc/ttop.toml")
 
 proc deleteConfig() =
   let dir = getServiceDir(false)

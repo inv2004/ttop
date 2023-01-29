@@ -50,6 +50,8 @@ nimble -d:release build
 ### Notification
 * stmp support was removed in prev version by the reason that static binary with ssl is more that 3Mb
 
+From v0.8.1 you can trigger extarnal tool, for example curl, to send notifications
+
 ### Config example
 ```toml
 # [data]

@@ -14,7 +14,6 @@ System monitoring tool with TUI, historical data service and triggers
 - [x] Static build
 - [x] Threads tree
 - [ ] Docker-related info
-- [ ] "red" flag notifications via ?telegram?
 
 ## Install
 

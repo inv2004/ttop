@@ -1,6 +1,5 @@
 import sys
 
-import sensors
 import os
 import strutils
 from posix import Uid, getpwuid
@@ -16,6 +15,8 @@ const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
 const SECTOR = 512
 var uhz = hz.uint
+
+const MIN_TEMP = -300000
 
 type ParseInfoError* = object of ValueError
   file*: string
@@ -114,7 +115,6 @@ proc newFullInfo(): FullInfoRef =
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef
 
 var prevInfo = newFullInfo()
-var sensorsEnabled = false
 
 template catchErr(file: untyped, filename: string, body: untyped) =
   let file: string = filename
@@ -122,13 +122,6 @@ template catchErr(file: untyped, filename: string, body: untyped) =
     body
   except:
     raise newParseInfoError(file, getCurrentException())
-
-proc initSensors*() =
-  try:
-    sensors.init()
-    sensorsEnabled = true
-  except LibraryError, SensorsException:
-    discard
 
 proc init*() =
   prevInfo = fullInfo()
@@ -405,13 +398,31 @@ proc netInfo(): OrderedTableRef[string, Net] =
           netOutDiff: checkedSub(netOut, prevInfo.net.getOrDefault(name).netOut)
         )
 
-proc tempInfo(): Temp =
-  if sensorsEnabled:
-    result.cpu = try: some(sensors.cpuMaxTemp()) except KeyError,
-        ValueError: none(float64)
-    result.nvme = try: some(sensors.nvmeMaxTemp()) except KeyError,
-        ValueError: none(float64)
+proc findMaxTemp(dir: string): Option[float64] =
+  var maxTemp = MIN_TEMP
+  for file in walkFiles(dir /../ "temp*_input"):
+    for line in lines(file):
+      let temp = parseInt(line)
+      if temp > maxTemp:
+        maxTemp = temp
+      break
+  if maxTemp != MIN_TEMP:
+    return some(maxTemp / 1000)
 
+proc tempInfo(): Temp =
+  var cnt = 0
+  for file in walkFiles("/sys/class/hwmon/hwmon*/name"):
+    case readFile(file)
+    of "coretemp\n":
+      result.cpu = findMaxTemp(file)
+      cnt.inc
+      if cnt == 2: break
+    of "nvme\n":
+      result.nvme = findMaxTemp(file)
+      cnt.inc
+      if cnt == 2: break
+    else:
+      discard
 
 # proc powerInfo(): uint =
 #   for f in walkFiles("/sys/class/power_supply/BAT*/power_now"):

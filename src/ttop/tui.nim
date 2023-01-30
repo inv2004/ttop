@@ -315,7 +315,6 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   tb.display()
 
 proc tui*() =
-  initSensors()
   init()
   illwillInit(fullscreen = true)
   defer: exitProc()

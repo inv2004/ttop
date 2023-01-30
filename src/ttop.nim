@@ -52,7 +52,7 @@ proc main() =
     else:
       echo Help
       quit 1
-  except CatchableError:
+  except:
     let ex = getCurrentException()
     echo ex.msg
     echo ex.getStackTrace()

@@ -17,6 +17,9 @@ const PROCFSLEN = PROCFS.len
 const SECTOR = 512
 var uhz = hz.uint
 
+type ParseInfoError* = object of ValueError
+  file*: string
+
 type SortField* = enum
   Cpu, Mem, Io, Pid, Name
 
@@ -97,6 +100,11 @@ type FullInfo* = object
 
 type FullInfoRef* = ref FullInfo
 
+proc newParseInfoError(file: string, parent: ref Exception): ref ParseInfoError =
+  let parentMsg = if parent != nil: parent.msg else: "nil"
+  var msg = "error during parsing " & file & ": " & parentMsg
+  newException(ParseInfoError, msg, parent)
+
 proc newFullInfo(): FullInfoRef =
   new(result)
   result.pidsInfo = newOrderedTable[uint, procfs.PidInfo]()
@@ -107,6 +115,13 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef
 
 var prevInfo = newFullInfo()
 var sensorsEnabled = false
+
+template catchErr(file: untyped, filename: string, body: untyped) =
+  let file: string = filename
+  try:
+    body
+  except:
+    raise newParseInfoError(file, getCurrentException())
 
 proc initSensors*() =
   try:
@@ -156,8 +171,9 @@ proc checkedDiv*(a, b: uint): float =
     return a.float / b.float
 
 proc parseUptime(): uint =
-  let line = readLines(PROCFS / "uptime", 1)[0]
-  uint(float(hz) * line.split()[0].parseFloat())
+  catchErr(file, PROCFS / "uptime"):
+    let line = readLines(file, 1)[0]
+    uint(float(hz) * line.split()[0].parseFloat())
 
 proc parseSize(str: string): uint =
   let normStr = str.strip(true, false)
@@ -171,83 +187,94 @@ proc parseSize(str: string): uint =
     parseUInt(normStr)
 
 proc memInfo(): MemInfo =
-  for line in lines(PROCFS / "meminfo"):
-    let parts = line.split(":", 1)
-    case parts[0]
-    of "MemTotal": result.MemTotal = parseSize(parts[1])
-    of "MemFree": result.MemFree = parseSize(parts[1])
-    of "MemAvailable": result.MemAvailable = parseSize(parts[1])
-    of "Buffers": result.Buffers = parseSize(parts[1])
-    of "Cached": result.Cached = parseSize(parts[1])
-    of "SwapTotal": result.SwapTotal = parseSize(parts[1])
-    of "SwapFree": result.SwapFree = parseSize(parts[1])
-  result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
+  catchErr(file, PROCFS / "meminfo"):
+    for line in lines(file):
+      let parts = line.split(":", 1)
+      case parts[0]
+      of "MemTotal": result.MemTotal = parseSize(parts[1])
+      of "MemFree": result.MemFree = parseSize(parts[1])
+      of "MemAvailable": result.MemAvailable = parseSize(parts[1])
+      of "Buffers": result.Buffers = parseSize(parts[1])
+      of "Cached": result.Cached = parseSize(parts[1])
+      of "SwapTotal": result.SwapTotal = parseSize(parts[1])
+      of "SwapFree": result.SwapFree = parseSize(parts[1])
+    result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
 proc parseTasks(pid: uint): seq[uint] =
-  for c in walkFiles(PROCFS / $pid / "task/*/children"):
-    for line in lines(c):
-      if line.len > 0:
-        result.add line.strip(false, true, chars = {' ', '\n', '\x00'}).split().map(parseUInt)
-      break
+  catchErr(file, PROCFS / $pid / "task/*/children"):
+    for c in walkFiles(file):
+      for line in lines(c):
+        if line.len > 0:
+          result.add line.strip(false, true, chars = {' ', '\n', '\x00'}).split().map(parseUInt)
+        break
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
-  let file = PROCFS / $pid / "stat"
-  let stat = stat(file)
-  result.uid = stat.st_uid
-  let userInfo = getpwuid(result.uid)
-  if not isNil userInfo:
-    result.user = $(userInfo.pw_name)
-  let buf = readFile(file)
+  catchErr(file, PROCFS / $pid / "stat"):
+    let stat = stat(file)
+    result.uid = stat.st_uid
+    let userInfo = getpwuid(result.uid)
+    if not isNil userInfo:
+      result.user = $(userInfo.pw_name)
+    let buf = readFile(file)
 
-  let cmdL = buf.find('(')
-  let cmdR = buf.rfind(')')
+    let cmdL = buf.find('(')
+    let cmdR = buf.rfind(')')
 
-  var pid: int
-  doAssert scanf(buf[0..<cmdL], "$i", pid)
-  result.name = buf[1+cmdL..<cmdR]
+    var pid: int
+    doAssert scanf(buf[0..<cmdL], "$i", pid)
+    result.name = buf[1+cmdL..<cmdR]
 
-  var tmp, utime, stime, starttime, vsize, rss, threads: int
-  doAssert scanf(buf[1+cmdR..^1], " $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
-            result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
-    tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
-    tmp, starttime, vsize, rss)
+    var tmp, utime, stime, starttime, vsize, rss, threads: int
+    doAssert scanf(buf[1+cmdR..^1], " $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
+              result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
+      tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
+      tmp, starttime, vsize, rss)
 
-  result.name.escape()
-  result.pid = pid.uint
-  result.vsize = vsize.uint
-  result.rss = pageSize * rss.uint
-  result.threads = threads
-  result.uptimeHz = uptimeHz - starttime.uint
-  result.uptime = result.uptimeHz div uhz
-  result.cpuTime = utime.uint + stime.uint
+    result.name.escape()
+    result.pid = pid.uint
+    result.vsize = vsize.uint
+    result.rss = pageSize * rss.uint
+    result.threads = threads
+    result.uptimeHz = uptimeHz - starttime.uint
+    result.uptime = result.uptimeHz div uhz
+    result.cpuTime = utime.uint + stime.uint
 
-  let prevCpuTime = prevInfo.pidsInfo.getOrDefault(result.pid).cpuTime
-  let delta =
-    if result.pid in prevInfo.pidsInfo:
-      checkedSub(result.uptimeHz, prevInfo.pidsInfo[result.pid].uptimeHz)
-    elif prevInfo.sys != nil:
-      checkedSub(uptimeHz, prevInfo.sys.uptimeHz)
-    else:
-      0
+    let prevCpuTime = prevInfo.pidsInfo.getOrDefault(result.pid).cpuTime
+    let delta =
+      if result.pid in prevInfo.pidsInfo:
+        checkedSub(result.uptimeHz, prevInfo.pidsInfo[result.pid].uptimeHz)
+      elif prevInfo.sys != nil:
+        checkedSub(uptimeHz, prevInfo.sys.uptimeHz)
+      else:
+        0
 
-  result.cpu = checkedDiv(100 * checkedSub(result.cpuTime, prevCpuTime), delta)
-  result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
+    result.cpu = checkedDiv(100 * checkedSub(result.cpuTime, prevCpuTime), delta)
+    result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
 
-  result.children = parseTasks(result.pid)
+    result.children = parseTasks(result.pid)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
-  let file = PROCFS / $pid / "io"
-  var name: string;
-  var val: int;
-  for line in lines(file):
-    doAssert scanf(line, "$w: $i", name, val)
-    case name
-    of "read_bytes":
-      result[0] = val.uint
-      result[2] = checkedSub(result[0], prevInfo.pidsInfo.getOrDefault(pid).ioRead)
-    of "write_bytes":
-      result[1] = val.uint
-      result[3] = checkedSub(result[1], prevInfo.pidsInfo.getOrDefault(pid).ioWrite)
+  catchErr(file, PROCFS / $pid / "io"):
+    var name: string;
+    var val: int;
+    for line in lines(file):
+      doAssert scanf(line, "$w: $i", name, val)
+      case name
+      of "read_bytes":
+        result[0] = val.uint
+        result[2] = checkedSub(result[0], prevInfo.pidsInfo.getOrDefault(pid).ioRead)
+      of "write_bytes":
+        result[1] = val.uint
+        result[3] = checkedSub(result[1], prevInfo.pidsInfo.getOrDefault(pid).ioWrite)
+
+proc parseCmd(pid: uint): string =
+  let file = PROCFS / $pid / "cmdline"
+  try:
+    let buf = readFile(file)
+    result = buf.strip(false, true, {'\0'}).replace('\0', ' ')
+    result.escape()
+  except:
+    discard
 
 proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   try:
@@ -257,29 +284,35 @@ proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     result.ioReadDiff = io[2]
     result.ioWrite = io[1]
     result.ioWriteDiff = io[3]
-  except IOError:
-    result.cmd = "IOError"
-    discard
-  let buf = readFile(PROCFS / $pid / "cmdline")
-  result.cmd = buf.strip(false, true, {'\0'}).replace('\0', ' ')
-  result.cmd.escape()
+  except ParseInfoError:
+    let ex = getCurrentException()
+    if ex.parent of IOError:
+      result.cmd = "IOError"
+    else:
+      raise
+  result.cmd = parseCmd(pid)
 
 proc pids*(): seq[uint] =
-  for f in walkDir(PROCFS):
-    if f.kind == pcDir:
-      let fName = f.path[1+PROCFSLEN..^1]
-      try:
-        result.add parseUInt fName
-      except ValueError:
-        discard
+  catchErr(dir, PROCFS):
+    for f in walkDir(dir):
+      if f.kind == pcDir:
+        let fName = f.path[1+PROCFSLEN..^1]
+        try:
+          result.add parseUInt fName
+        except ValueError:
+          discard
 
 proc pidsInfo*(uptimeHz: uint, memInfo: MemInfo): OrderedTableRef[uint, PidInfo] =
   result = newOrderedTable[uint, PidInfo]()
   for pid in pids():
     try:
       result[pid] = parsePid(pid, uptimeHz, memInfo)
-    except OSError:
-      if osLastError() != OSErrorCode(2):
+    except ParseInfoError:
+      let ex = getCurrentException()
+      if ex.parent of OSError:
+        if osLastError() != OSErrorCode(2):
+          raise
+      else:
         raise
 
 proc getOrDefault(s: seq[CpuInfo], i: int): CpuInfo =
@@ -287,25 +320,26 @@ proc getOrDefault(s: seq[CpuInfo], i: int): CpuInfo =
     return s[i]
 
 proc parseStat(): (CpuInfo, seq[CpuInfo]) =
-  for line in lines(PROCFS / "stat"):
-    if line.startsWith("cpu"):
-      let parts = line.split()
-      var off = 1
-      if parts[1] == "":
-        off = 2
-      let all = parts[off..<off+8].map(parseUInt)
-      let total = all.foldl(a+b)
-      let idle = all[3] + all[4]
-      if off == 1:
-        let curTotal = checkedSub(total, prevInfo.cpus.getOrDefault(result[1].len).total)
-        let curIdle = checkedSub(idle, prevInfo.cpus.getOrDefault(result[1].len).idle)
-        let cpu = checkedDiv(100 * (curTotal - curIdle), curTotal)
-        result[1].add CpuInfo(total: total, idle: idle, cpu: cpu)
-      else:
-        let curTotal = checkedSub(total, prevInfo.cpu.total)
-        let curIdle = checkedSub(idle, prevInfo.cpu.idle)
-        let cpu = checkedDiv(100 * (curTotal - curIdle), curTotal)
-        result[0] = CpuInfo(total: total, idle: idle, cpu: cpu)
+  catchErr(file, PROCFS / "stat"):
+    for line in lines(file):
+      if line.startsWith("cpu"):
+        let parts = line.split()
+        var off = 1
+        if parts[1] == "":
+          off = 2
+        let all = parts[off..<off+8].map(parseUInt)
+        let total = all.foldl(a+b)
+        let idle = all[3] + all[4]
+        if off == 1:
+          let curTotal = checkedSub(total, prevInfo.cpus.getOrDefault(result[1].len).total)
+          let curIdle = checkedSub(idle, prevInfo.cpus.getOrDefault(result[1].len).idle)
+          let cpu = checkedDiv(100 * (curTotal - curIdle), curTotal)
+          result[1].add CpuInfo(total: total, idle: idle, cpu: cpu)
+        else:
+          let curTotal = checkedSub(total, prevInfo.cpu.total)
+          let curIdle = checkedSub(idle, prevInfo.cpu.idle)
+          let cpu = checkedDiv(100 * (curTotal - curIdle), curTotal)
+          result[0] = CpuInfo(total: total, idle: idle, cpu: cpu)
 
 proc sysInfo*(): ref SysInfo =
   new(result)
@@ -315,56 +349,61 @@ proc sysInfo*(): ref SysInfo =
 
 proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
   result = newOrderedTable[string, Disk]()
-  for line in lines(PROCFS / "mounts"):
-    if line.startsWith("/dev/"):
-      let parts = line.split(maxsplit = 2)
-      let name = parts[0]
-      let path = parts[1]
-      var stat: Statvfs
-      if statvfs(cstring path, stat) != 0:
-        continue
-      result[name] = Disk(avail: stat.f_bfree * stat.f_bsize,
-                          total: stat.f_blocks * stat.f_bsize,
-                          path: path)
-  for line in lines(PROCFS / "diskstats"):
-    let parts = line.splitWhitespace()
-    let name = parts[2]
-    if name in result:
-      # let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
-      let io = SECTOR * parseUInt parts[12]
-      result[name].io = io
-      # result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(
-      #     name).io) / float msPassed
-      result[name].ioUsage = checkedSub(io, prevInfo.disk.getOrDefault(name).io)
-      let ioRead = SECTOR * parseUInt parts[6]
-      result[name].ioRead = ioRead
-      # result[name].ioUsageRead = 100 * float(ioRead -
-      #     prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
-      result[name].ioUsageRead = checkedSub(ioRead, prevInfo.disk.getOrDefault(name).ioRead)
-      let ioWrite = SECTOR * parseUInt parts[10]
-      result[name].ioWrite = ioWrite
-      # result[name].ioUsageWrite = 100 * float(ioWrite -
-      #     prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
-      result[name].ioUsageWrite = checkedSub(ioWrite,
-          prevInfo.disk.getOrDefault(name).ioWrite)
+  catchErr(file, PROCFS / "mounts"):
+    for line in lines(file):
+      if line.startsWith("/dev/"):
+        let parts = line.split(maxsplit = 2)
+        let name = parts[0]
+        let path = parts[1]
+        var stat: Statvfs
+        if statvfs(cstring path, stat) != 0:
+          continue
+        result[name] = Disk(avail: stat.f_bfree * stat.f_bsize,
+                            total: stat.f_blocks * stat.f_bsize,
+                            path: path)
+
+  catchErr(file2, PROCFS / "diskstats"):
+    for line in lines(file2):
+      let parts = line.splitWhitespace()
+      let name = parts[2]
+      if name in result:
+        # let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
+        let io = SECTOR * parseUInt parts[12]
+        result[name].io = io
+        # result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(
+        #     name).io) / float msPassed
+        result[name].ioUsage = checkedSub(io, prevInfo.disk.getOrDefault(name).io)
+        let ioRead = SECTOR * parseUInt parts[6]
+        result[name].ioRead = ioRead
+        # result[name].ioUsageRead = 100 * float(ioRead -
+        #     prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
+        result[name].ioUsageRead = checkedSub(ioRead,
+            prevInfo.disk.getOrDefault(name).ioRead)
+        let ioWrite = SECTOR * parseUInt parts[10]
+        result[name].ioWrite = ioWrite
+        # result[name].ioUsageWrite = 100 * float(ioWrite -
+        #     prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
+        result[name].ioUsageWrite = checkedSub(ioWrite,
+            prevInfo.disk.getOrDefault(name).ioWrite)
+
   return result
 
 proc netInfo(): OrderedTableRef[string, Net] =
   result = newOrderedTable[string, Net]()
-  let file = PROCFS / "net/dev"
-  for line in lines(file):
-    let parts = line.split(":", 1)
-    if parts.len == 2:
-      let name = parts[0].strip()
-      let fields = parts[1].splitWhitespace()
-      let netIn = parseUInt fields[0]
-      let netOut = parseUInt fields[8]
-      result[name] = Net(
-        netIn: netIn,
-        netInDiff: checkedSub(netIn, prevInfo.net.getOrDefault(name).netIn),
-        netOut: netOut,
-        netOutDiff: checkedSub(netOut, prevInfo.net.getOrDefault(name).netOut)
-      )
+  catchErr(file, PROCFS / "net/dev"):
+    for line in lines(file):
+      let parts = line.split(":", 1)
+      if parts.len == 2:
+        let name = parts[0].strip()
+        let fields = parts[1].splitWhitespace()
+        let netIn = parseUInt fields[0]
+        let netOut = parseUInt fields[8]
+        result[name] = Net(
+          netIn: netIn,
+          netInDiff: checkedSub(netIn, prevInfo.net.getOrDefault(name).netIn),
+          netOut: netOut,
+          netOutDiff: checkedSub(netOut, prevInfo.net.getOrDefault(name).netOut)
+        )
 
 proc tempInfo(): Temp =
   if sensorsEnabled:

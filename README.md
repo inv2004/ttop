@@ -52,7 +52,7 @@ nimble -d:release build
 
 From v0.8.1 you can trigger extarnal tool, for example curl, to send notifications
 
-![image](https://user-images.githubusercontent.com/4949069/215401877-2cf6945f-ba11-441f-a8da-1568d4017d8e.png)
+![image](https://user-images.githubusercontent.com/4949069/215402008-eb0325f9-3e6e-4908-a6aa-d7b3b64f09db.png)
 
 ### Config example
 `~/.config/ttop.toml` or `/etc/ttop.toml`

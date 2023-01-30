@@ -73,7 +73,7 @@ curl -X POST \
 # cmd receives text from stdin. The following env vars are set:
 #   TTOP_ALERT (true|false) - if alert
 #   TTOP_INFO (true|false)  - opposite to alert
-#   TTOP_TYPE (alert|info)    - trigger type
+#   TTOP_TYPE (alert|info)  - trigger type
 #   TTOP_HOST               - host name
 # you can find your CHAT_ID by send smth to your bot and run:
 #    curl https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getUpdates

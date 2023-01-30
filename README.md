@@ -9,7 +9,7 @@ System monitoring tool with TUI, historical data service and triggers
 - [x] TUI with critical values highlight
 - [x] External triggers (for notifications or other needs)
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
-- [x] Temperature via [libsensors](https://github.com/lm-sensors/lm-sensors/)
+- [x] Temperature via `sysfs`
 - [x] User-space only, doesn't require root permissions
 - [x] Static build
 - [x] Threads tree

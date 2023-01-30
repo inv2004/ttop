@@ -3,7 +3,7 @@
 pkgname=ttop
 pkgver=0.4.1
 pkgrel=1
-pkgdesc="System monitoring tool with TUI and historical data service"
+pkgdesc="System monitoring tool with TUI, historical data service and triggers"
 arch=('x86_64')
 url="https://github.com/inv2004/ttop"
 license=("MIT")

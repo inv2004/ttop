@@ -79,7 +79,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   tb.write "|%"
   temp(tb, info.temp.cpu, checkCpuTempLimit(info.temp))
   tb.setCursorPos(offset, 3)
-  let memStr = formatS(mi.MemAvailable, mi.MemTotal)
+  let memStr = formatD(mi.MemAvailable, mi.MemTotal)
   let sign = if mi.MemDiff > 0: '+' elif mi.MemDiff == 0: '=' else: '-'
   if checkMemLimit(mi):
     tb.write bgRed

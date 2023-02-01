@@ -55,6 +55,16 @@ From v0.8.1 you can trigger external tool, for example curl, to send notificatio
 
 ### Config example
 `~/.config/ttop.toml` or `/etc/ttop.toml`
+
+#### My default server's config
+
+```toml
+[[trigger]]
+cmd = "$HOME/bin/tel.sh"
+```
+
+#### Config with all parameters described
+
 ```toml
 # [data]
 # path = "/var/log/ttop"   # custom storage path (default = if exists /var/log/ttop, else ~/.cache/ttop )

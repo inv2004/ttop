@@ -13,10 +13,13 @@ import blog
 import asciigraph
 from terminal import setCursorXPos
 
-proc exitProc() {.noconv.} =
+proc stopTui() {.noconv.} =
   illwillDeinit()
   setCursorXPos(0)
   showCursor()
+
+proc exitProc() {.noconv.} =
+  stopTui()
   quit(0)
 
 const offset = 2
@@ -317,7 +320,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
 proc tui*() =
   init()
   illwillInit(fullscreen = true)
-  defer: exitProc()
+  defer: stopTui()
   setControlCHook(exitProc)
   hideCursor()
   var draw = false

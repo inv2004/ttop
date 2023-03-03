@@ -27,7 +27,7 @@ func checkCpuTempLimit*(t: Temp): bool =
 
 func checkSsdTempLimit*(t: Temp): bool =
   if t.nvme.isSome:
-    return t.cpu.get >= ssdTempLimit
+    return t.nvme.get >= ssdTempLimit
 
 func checkDiskLimit*(d: Disk): bool =
   dskLimit <= checkedDiv(100 * checkedSub(d.total, d.avail), d.total)

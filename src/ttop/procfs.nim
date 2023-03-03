@@ -413,7 +413,7 @@ proc tempInfo(): Temp =
   var cnt = 0
   for file in walkFiles("/sys/class/hwmon/hwmon*/name"):
     case readFile(file)
-    of "coretemp\n":
+    of "coretemp\n", "k10temp\n":
       result.cpu = findMaxTemp(file)
       cnt.inc
       if cnt == 2: break

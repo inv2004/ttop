@@ -427,13 +427,11 @@ proc tui*() =
       else: discard
 
     if draw or refresh == 10:
-      if hist == 0:
-        blog = moveBlog(+1, blog, stats.len, stats.len)[0]
       if refresh == 10:
+        if hist == 0:
+          blog = moveBlog(+1, blog, stats.len, stats.len)[0]
         (info, stats) = hist(hist, blog, live)
         refresh = 0
-      else:
-        (info, stats) = histNoLive(hist, blog)
       redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
           threads, forceLive)
       if draw:

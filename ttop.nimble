@@ -1,6 +1,6 @@
 # Package
 
-version = "0.8.7"
+version = "0.8.8"
 author = "inv2004"
 description = "Monitoring tool with historical snapshots and alerts"
 license = "MIT"

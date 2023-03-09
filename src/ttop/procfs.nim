@@ -345,6 +345,8 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
   catchErr(file, PROCFS / "mounts"):
     for line in lines(file):
       if line.startsWith("/dev/"):
+        if line.startsWith("/dev/loop"):
+          continue
         let parts = line.split(maxsplit = 2)
         let name = parts[0]
         let path = parts[1]

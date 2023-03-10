@@ -13,6 +13,7 @@ type
     cmd*: string
   CfgRef* = ref object
     path*: string
+    light*: bool
     triggers*: seq[Trigger]
 
 var cfg: CfgRef
@@ -36,6 +37,7 @@ proc initCfg*() =
   let toml = loadConfig()
 
   cfg = CfgRef(
+    light: toml{"light"}.getBool(),
     path: toml{"data", "path"}.getStr(getDataDir())
   )
 

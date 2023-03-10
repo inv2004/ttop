@@ -1,6 +1,7 @@
 import illwill
 import os
 import procfs
+import config
 import strutils
 import strformat
 import tables
@@ -12,6 +13,10 @@ import sequtils
 import blog
 import asciigraph
 from terminal import setCursorXPos
+
+const fgDarkColor = fgWhite
+const fgLightColor = fgBlack
+var fgColor = fgDarkColor
 
 proc stopTui() {.noconv.} =
   illwillDeinit()
@@ -86,7 +91,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
   let sign = if mi.MemDiff > 0: '+' elif mi.MemDiff == 0: '=' else: '-'
   if checkMemLimit(mi):
     tb.write bgRed
-  tb.write fgGreen, "MEM: ", fgNone, fgWhite, styleBright, memStr
+  tb.write fgGreen, "MEM: ", fgNone, fgColor, styleBright, memStr
   tb.write fmt"  {sign&abs(mi.MemDiff).formatS():>9}    BUF: {mi.Buffers.formatS()}    CACHE: {mi.Cached.formatS()}"
   if checkSwpLimit(mi):
     tb.write bgRed
@@ -104,7 +109,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
         tb.write " | "
       let disk = info.disk[k]
       let bg = if checkDiskLimit(disk): bgRed else: bgNone
-      tb.write fgMagenta, disk.path, fgWhite, " ", bg,
+      tb.write fgMagenta, disk.path, fgColor, " ", bg,
           fmt"{formatD(disk.avail, disk.total)}", bgNone,
               fmt" (rw: {formatS(disk.ioUsageRead, disk.ioUsageWrite)})"
     if i == 0:
@@ -127,7 +132,7 @@ proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
       if i > 0:
         tb.write " | "
       let net = info.net[k]
-      tb.write fgCyan, k, fgWhite, " ", formatS(net.netInDiff,
+      tb.write fgCyan, k, fgColor, " ", formatS(net.netInDiff,
           net.netOutDiff)
 
 proc graphData(stats: seq[StatV2], sort: SortField, width: int): seq[float] =
@@ -233,7 +238,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write ' '.repeat(tb.width-63), bgNone
   inc y
   var i: uint = 0
-  tb.write fgWhite
+  tb.write fgColor
   for (_, p) in pi.pairs:
     if filter.len >= 2:
       if filter[1..^1] notin $p.pid and filter[1..^1] notin toLowerAscii(p.cmd):
@@ -245,9 +250,9 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write p.state
     tb.write " ", p.pid.cut(6, true, scrollX)
     if p.user == "":
-      tb.write " ", fgMagenta, int(p.uid).cut(8, false, scrollX), fgWhite
+      tb.write " ", fgMagenta, int(p.uid).cut(8, false, scrollX), fgColor
     else:
-      tb.write " ", fgYellow, p.user.cut(8, false, scrollX), fgWhite
+      tb.write " ", fgYellow, p.user.cut(8, false, scrollX), fgColor
     if p.mem >= rssLimit:
       tb.write bgRed
     tb.write " ", p.rss.formatS().cut(10, true, scrollX), bgNone
@@ -273,7 +278,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       cmd.add p.cmd
     else:
       cmd.add p.name
-    tb.write "  ", fgCyan, cmd.cut(tb.width - 65, false, scrollX), fgWhite
+    tb.write "  ", fgCyan, cmd.cut(tb.width - 65, false, scrollX), fgColor
 
     inc y
     if y > tb.height-3:
@@ -324,6 +329,10 @@ proc tui*() =
   defer: stopTui()
   setControlCHook(exitProc)
   hideCursor()
+
+  if getCfg().light:
+    fgColor = fgLightColor
+
   var draw = false
   var (blog, hist) = moveBlog(0, "", 0, 0)
   var curSort = Cpu

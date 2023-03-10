@@ -177,7 +177,7 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string, sort:
         tb.write bgNone
       else:
         tb.writeR blog
-  except:
+  except CatchableError, Defect:
     tb.write("error in graph: " & $deduplicate(data))
     tb.setCursorPos offset, tb.getCursorYPos() + 1
 

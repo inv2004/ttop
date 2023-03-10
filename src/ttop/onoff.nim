@@ -192,7 +192,7 @@ proc onoff*(enable: bool, interval: uint = 10) =
     try:
       discard cmd "systemctl is-active --quiet /"
       true
-    except CatchableError:
+    except CatchableError, Defect:
       false
 
   if isSysD:

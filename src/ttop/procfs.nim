@@ -120,7 +120,7 @@ template catchErr(file: untyped, filename: string, body: untyped) =
   let file: string = filename
   try:
     body
-  except:
+  except CatchableError, Defect:
     raise newParseInfoError(file, getCurrentException())
 
 proc init*() =
@@ -198,7 +198,7 @@ proc parseTasks(pid: uint): seq[uint] =
     for c in walkFiles(file):
       for line in lines(c):
         if line.len > 0:
-          result.add line.strip(false, true, chars = {' ', '\n', '\x00'}).split().map(parseUInt)
+          result.add line.strip().split().map(parseUInt)
         break
 
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
@@ -266,7 +266,7 @@ proc parseCmd(pid: uint): string =
     let buf = readFile(file)
     result = buf.strip(false, true, {'\0'}).replace('\0', ' ')
     result.escape()
-  except:
+  except CatchableError, Defect:
     discard
 
 proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =

@@ -187,7 +187,7 @@ proc timeButtons(tb: var TerminalBuffer, cnt: int, forceLive: bool) =
   else:
     tb.write " ", HelpCol, "[],{}", fgNone, " - timeshift "
 
-proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
+proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
     cnt: int, thr, forceLive: bool) =
   tb.setCursorPos offset, tb.height - 1
 
@@ -213,7 +213,6 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
 
   let x = tb.getCursorXPos()
 
-  let (w, h) = terminalSize()
   if x + 26 < w:
     if scrollX > 0:
       tb.setCursorXPos(w - 26)
@@ -224,7 +223,11 @@ proc help(tb: var TerminalBuffer, curSort: SortField, scrollX, scrollY,
 
   if x + 15 < w:
     tb.setCursorXPos(w - 15)
-    tb.write fmt " WH: {w}x{h} "
+    if scrollX > 0 or scrollY > 0:
+      tb.write HelpCol, "z", fgNone
+    else:
+      tb.write " "
+    tb.write fmt "WH: {w}x{h} "
 
 proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
@@ -268,7 +271,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write " ", rwStr.cut(9, true, scrollX)
 
     tb.write " ", p.uptime.formatT().cut(8, false, scrollX)
-    
+
     var cmd = ""
     if thr:
       tb.write " ", ($p.threads).cut(3, true, scrollX)
@@ -320,7 +323,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   if filter.len > 0:
     filter(tb, filter, stats.len, forceLive)
   else:
-    help(tb, curSort, scrollX, scrollY, stats.len, threads, forceLive)
+    help(tb, curSort, w, h, scrollX, scrollY, stats.len, threads, forceLive)
   tb.display()
 
 proc tui*() =
@@ -369,6 +372,7 @@ proc tui*() =
       of Key.PageDown:
         scrollY += 10
         draw = true
+      of Key.Z: scrollX = 0; scrollY = 0; draw = true
       of Key.P: curSort = Pid; draw = true
       of Key.M: curSort = Mem; draw = true
       of Key.I: curSort = Io; draw = true
@@ -451,4 +455,3 @@ proc tui*() =
     else:
       inc refresh
       sleep 100
-

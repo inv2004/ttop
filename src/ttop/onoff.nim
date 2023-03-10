@@ -15,6 +15,8 @@ proc createToml(file: string) =
   echo "create ", file
   writeFile(file,
       """
+# light = false
+
 # [data]
 # path = "/var/log/ttop"   # custom storage path (default = if exists /var/log/ttop, else ~/.cache/ttop )
 

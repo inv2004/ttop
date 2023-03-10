@@ -66,8 +66,10 @@ cmd = "$HOME/bin/tel.sh"
 #### Config with all parameters described
 
 ```toml
+light = false            # set true for light term (default = false)
+
 # [data]
-# path = "/var/log/ttop"   # custom storage path (default = if exists /var/log/ttop, else ~/.cache/ttop )
+# path = "/var/log/ttop" # custom storage path (default = if exists /var/log/ttop, else ~/.cache/ttop )
 
 [[trigger]]              # telegram example
 on_alert = true          # execute trigger on alert (true if no other on_* provided)

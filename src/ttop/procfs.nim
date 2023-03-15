@@ -166,7 +166,9 @@ proc checkedDiv*(a, b: uint): float =
 proc parseUptime(): uint =
   catchErr(file, PROCFS / "uptime"):
     let line = readLines(file, 1)[0]
-    uint(float(hz) * line.split()[0].parseFloat())
+    var f: float
+    doAssert scanf(line, "$f", f)
+    uint(float(hz) * f)
 
 proc parseSize(str: string): uint =
   let normStr = str.strip(true, false)
@@ -219,9 +221,9 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
 
     var tmp, utime, stime, starttime, vsize, rss, threads: int
     doAssert scanf(buf[1+cmdR..^1], " $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
-              result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp, # 10
-      tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
-      tmp, starttime, vsize, rss)
+                      result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp,          # 10
+                      tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
+                      tmp, starttime, vsize, rss)
 
     result.name.escape()
     result.pid = pid.uint
@@ -266,7 +268,7 @@ proc parseCmd(pid: uint): string =
     let buf = readFile(file)
     result = buf.strip(false, true, {'\0'}).replace('\0', ' ')
     result.escape()
-  except CatchableError, Defect:
+  except CatchableError:
     discard
 
 proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
@@ -285,13 +287,12 @@ proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
       raise
   result.cmd = parseCmd(pid)
 
-proc pids*(): seq[uint] =
+iterator pids*(): uint =
   catchErr(dir, PROCFS):
     for f in walkDir(dir):
       if f.kind == pcDir:
-        let fName = f.path[1+PROCFSLEN..^1]
         try:
-          result.add parseUInt fName
+          yield parseUInt f.path[1+PROCFSLEN..^1]
         except ValueError:
           discard
 
@@ -314,16 +315,16 @@ proc getOrDefault(s: seq[CpuInfo], i: int): CpuInfo =
 
 proc parseStat(): (CpuInfo, seq[CpuInfo]) =
   catchErr(file, PROCFS / "stat"):
+    var name: string
+    var idx, v1, v2, v3, v4, v5, v6, v7, v8: int
+
     for line in lines(file):
       if line.startsWith("cpu"):
-        let parts = line.split()
-        var off = 1
-        if parts[1] == "":
-          off = 2
-        let all = parts[off..<off+8].map(parseUInt)
-        let total = all.foldl(a+b)
-        let idle = all[3] + all[4]
-        if off == 1:
+        doAssert scanf(line, "$w $s$i $i $i $i $i $i $i $i", name, v1, v2, v3, v4, v5, v6, v7, v8)
+        let total = uint(v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8)
+        let idle = uint(v4 + v5)
+
+        if scanf(name, "cpu$i", idx):
           let curTotal = checkedSub(total, prevInfo.cpus.getOrDefault(result[1].len).total)
           let curIdle = checkedSub(idle, prevInfo.cpus.getOrDefault(result[1].len).idle)
           let cpu = checkedDiv(100 * (curTotal - curIdle), curTotal)
@@ -359,46 +360,43 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
 
   catchErr(file2, PROCFS / "diskstats"):
     for line in lines(file2):
-      let parts = line.splitWhitespace()
-      let name = parts[2]
-      if name in result:
-        # let msPassed = (dt - prevInfo.sys.datetime).inMilliseconds()
-        let io = SECTOR * parseUInt parts[12]
-        result[name].io = io
-        # result[name].ioUsage = 100 * float(io - prevInfo.disk.getOrDefault(
-        #     name).io) / float msPassed
-        result[name].ioUsage = checkedSub(io, prevInfo.disk.getOrDefault(name).io)
-        let ioRead = SECTOR * parseUInt parts[6]
-        result[name].ioRead = ioRead
-        # result[name].ioUsageRead = 100 * float(ioRead -
-        #     prevInfo.disk.getOrDefault(name).ioRead) / float msPassed
-        result[name].ioUsageRead = checkedSub(ioRead,
-            prevInfo.disk.getOrDefault(name).ioRead)
-        let ioWrite = SECTOR * parseUInt parts[10]
-        result[name].ioWrite = ioWrite
-        # result[name].ioUsageWrite = 100 * float(ioWrite -
-        #     prevInfo.disk.getOrDefault(name).ioWrite) / float msPassed
-        result[name].ioUsageWrite = checkedSub(ioWrite,
-            prevInfo.disk.getOrDefault(name).ioWrite)
+      var tmp, read, write, total: int
+      var name: string
+      doAssert scanf(line, "$s$i $s$i $w $i $i $i $i $i $i $i $i $i $i", tmp, tmp, name, tmp, tmp, tmp, read, tmp, tmp, tmp, write, tmp, total)
+
+      if name notin result:
+        continue
+
+      let io = SECTOR * total.uint
+      result[name].io = io
+      result[name].ioUsage = checkedSub(io, prevInfo.disk.getOrDefault(name).io)
+      let ioRead = SECTOR * read.uint
+      result[name].ioRead = ioRead
+      result[name].ioUsageRead = checkedSub(ioRead, prevInfo.disk.getOrDefault(name).ioRead)
+      let ioWrite = SECTOR * write.uint
+      result[name].ioWrite = ioWrite
+      result[name].ioUsageWrite = checkedSub(ioWrite, prevInfo.disk.getOrDefault(name).ioWrite)
 
   return result
 
 proc netInfo(): OrderedTableRef[string, Net] =
   result = newOrderedTable[string, Net]()
   catchErr(file, PROCFS / "net/dev"):
+    var i = 0
     for line in lines(file):
-      let parts = line.split(":", 1)
-      if parts.len == 2:
-        let name = parts[0].strip()
-        let fields = parts[1].splitWhitespace()
-        let netIn = parseUInt fields[0]
-        let netOut = parseUInt fields[8]
-        result[name] = Net(
-          netIn: netIn,
-          netInDiff: checkedSub(netIn, prevInfo.net.getOrDefault(name).netIn),
-          netOut: netOut,
-          netOutDiff: checkedSub(netOut, prevInfo.net.getOrDefault(name).netOut)
-        )
+      inc i
+      if i in 1..2:
+        continue
+      var name: string
+      var tmp, netIn, netOut: int
+      doAssert scanf(line, "$s$w:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i", name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut)
+
+      result[name] = Net(
+        netIn: netIn.uint,
+        netInDiff: checkedSub(netIn.uint, prevInfo.net.getOrDefault(name).netIn),
+        netOut: netOut.uint,
+        netOutDiff: checkedSub(netOut.uint, prevInfo.net.getOrDefault(name).netOut)
+      )
 
 proc findMaxTemp(dir: string): Option[float64] =
   var maxTemp = MIN_TEMP
@@ -492,8 +490,10 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  let s = "a:   100"
-  let fs = s.split(":", 1)
-  echo fs
-  echo parseSize(fs[1])
+  var name: string
+  var idx, v1, v2, v3, v4, v5, v6, v7, v8: int
+
+  for line in lines("/proc/stat"):
+    if line.startsWith("cpu"):
+      echo line
 

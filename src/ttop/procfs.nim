@@ -379,6 +379,14 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
 
   return result
 
+proc devName(s: string, o: var string, off: int): int =
+  while off+result < s.len:
+    let c = s[off+result]
+    if not (c.isAlphaNumeric or c in "-_"):
+      break
+    o.add c
+    inc result
+
 proc netInfo(): OrderedTableRef[string, Net] =
   result = newOrderedTable[string, Net]()
   catchErr(file, PROCFS / "net/dev"):
@@ -389,7 +397,8 @@ proc netInfo(): OrderedTableRef[string, Net] =
         continue
       var name: string
       var tmp, netIn, netOut: int
-      doAssert scanf(line, "$s$w:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i", name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut)
+      if not scanf(line, "$s${devName}:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i", name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut):
+        continue
 
       result[name] = Net(
         netIn: netIn.uint,
@@ -491,9 +500,9 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
 
 when isMainModule:
   var name: string
-  var idx, v1, v2, v3, v4, v5, v6, v7, v8: int
+  var tmp, netIn, netOut: int
 
-  for line in lines("/proc/stat"):
-    if line.startsWith("cpu"):
-      echo line
-
+  for line in lines("net_line.txt"):
+    echo line
+    echo scanf(line, "$s${devName}:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i", name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut)
+    echo name

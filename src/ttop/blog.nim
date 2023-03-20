@@ -9,6 +9,7 @@ import times
 import os
 import sequtils
 import algorithm
+import jsony
 
 type StatV1* = object
   prc*: int
@@ -27,6 +28,16 @@ proc toStatV2(a: StatV1): StatV2 =
   result.prc = a.prc
   result.cpu = a.cpu
   result.io = a.io
+
+const TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:sszzz"
+
+proc dumpHook*(s: var string, v: DateTime) =
+  s.add '"' & v.format(TIME_FORMAT) & '"'
+
+proc parseHook*(s: string, i: var int, v: var DateTime) =
+  var str: string
+  parseHook(s, i, str)
+  v = parse(str, TIME_FORMAT)
 
 proc flock(fd: FileHandle, op: int): int {.header: "<sys/file.h>",
     importc: "flock".}
@@ -66,6 +77,13 @@ proc stat(s: FileStream): StatV2 =
   else:
     discard
 
+proc infoFromGzip(buf: string): FullInfo =
+  let jsonStr = uncompress(buf)
+  try:
+    return jsonStr.fromJson(FullInfo)
+  except JsonError:
+    return to[FullInfo](jsonStr)
+
 proc hist*(ii: int, blog: string, live: var seq[StatV2]): (FullInfoRef, seq[StatV2]) =
   let fi = fullInfo()
   if ii == 0:
@@ -90,12 +108,13 @@ proc hist*(ii: int, blog: string, live: var seq[StatV2]): (FullInfoRef, seq[Stat
     discard s.readUInt32()
     if ii == result[1].len:
       new(result[0])
-      result[0][] = to[FullInfo](uncompress(buf))
+      result[0][] = infoFromGzip(buf)
 
   if ii == -1:
     if result[1].len > 0:
       new(result[0])
-      result[0][] = to[FullInfo](uncompress(buf))
+      result[0][] = infoFromGzip(buf)
+
     else:
       result[0] = fullInfo()
 
@@ -142,7 +161,7 @@ proc save*(): FullInfoRef =
   var lastBlog = moveBlog(0, "", 0, 0)[0]
   var (prev, _) = histNoLive(-1, lastBlog)
   result = if prev == nil: fullInfo() else: fullInfo(prev)
-  let buf = compress($$result[])
+  let buf = compress(result[].toJson())
   let blog = saveBlog()
   let file = open(blog, fmAppend)
   if flock(file.getFileHandle, 2 or 4) != 0:
@@ -160,15 +179,7 @@ proc save*(): FullInfoRef =
   s.write buf.len.uint32
 
 when isMainModule:
-  var lastBlog = moveBlog(0, "", 0, 0)[0]
-  var (prev, _) = hist(-1, lastBlog)
-  let info = if prev == nil: fullInfo() else: fullInfo(prev)
-  info.pidsInfo.clear()
-  info.cpus.setLen 0
-  # info.disk.clear()
-  echo prev.disk["nvme0n1p5"].ioWrite
-  echo info.disk["nvme0n1p5"].ioWrite
-  echo info.disk["nvme0n1p5"].ioUsageWrite
-  echo info[]
-  let buf = compress($$info[])
-
+  var (blog, h) = moveBlog(0, "", 0, 0)
+  var live = newSeq[StatV2]()
+  var (info, stats) = hist(h, blog, live)
+  echo info.toJson

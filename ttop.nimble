@@ -15,6 +15,7 @@ requires "illwill"
 requires "zippy"
 requires "asciigraph"
 requires "parsetoml"
+requires "https://github.com/inv2004/jsony#non_quoted_key"
 
 const lmDir = "lm-sensors"
 
@@ -24,3 +25,5 @@ task static, "build static release":
 task staticdebug, "build static debug":
   exec "nim -d:debug --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop-debug c src/ttop.nim"
 
+task bench, "bench":
+  exec "nim -d:release --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop c -r bench/bench.nim"

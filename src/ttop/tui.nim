@@ -459,11 +459,11 @@ proc tui*() =
 
     if not draw or reload:
       sleep 100
+      if refresh == 10:
+        refresh = 0
+      else:
+        inc refresh
 
     draw = false
     reload = false
-    if refresh == 10:
-      refresh = 0
-    else:
-      inc refresh
     

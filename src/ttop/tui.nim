@@ -337,6 +337,7 @@ proc tui*() =
     fgColor = fgLightColor
 
   var draw = false
+  var reload = false
   var (blog, hist) = moveBlog(0, "", 0, 0)
   var curSort = Cpu
   var scrollX, scrollY = 0
@@ -386,19 +387,19 @@ proc tui*() =
           (blog, hist) = moveBlog(-1, blog, hist, stats.len)
         else:
           forceLive = not forceLive
-        draw = true
+        reload = true
       of Key.RightBracket:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-        draw = true
+        reload = true
       of Key.LeftBrace:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-        draw = true
+        reload = true
       of Key.RightBrace:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-        draw = true
+        reload = true
       else: discard
     else:
       case key
@@ -425,33 +426,44 @@ proc tui*() =
           (blog, hist) = moveBlog(-1, blog, hist, stats.len)
         else:
           forceLive = not forceLive
-        draw = true
+        reload = true
       of Key.RightBracket:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-        draw = true
+        reload = true
       of Key.LeftBrace:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-        draw = true
+        reload = true
       of Key.RightBrace:
         if not forceLive:
           (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-        draw = true
+        reload = true
       else: discard
 
-    if draw or refresh == 10:
-      if refresh == 10:
-        if hist == 0:
-          blog = moveBlog(+1, blog, stats.len, stats.len)[0]
+    if refresh == 10:
+      reload = true
+
+    if reload:
+      if hist == 0:
+        blog = moveBlog(+1, blog, stats.len, stats.len)[0]
+      if refresh != 10:
+        (info, stats) = histNoLive(hist, blog)
+      else:
         (info, stats) = hist(hist, blog, live)
-        refresh = 0
+      draw = true
+
+    if draw:
       redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
           threads, forceLive)
-      if draw:
-        draw = false
-      else:
-        sleep 100
+
+    if not draw or reload:
+      sleep 100
+
+    draw = false
+    reload = false
+    if refresh == 10:
+      refresh = 0
     else:
       inc refresh
-      sleep 100
+    

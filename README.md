@@ -8,7 +8,7 @@ System monitoring tool with TUI, historical data service and triggers
 - [x] Scroll via historical data
 - [x] External triggers (for notifications or other needs)
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
-- [x] TUI with critical values highlight
+- [x] TUI with critical values highlights
 - [x] Temperature via `sysfs`
 - [x] User-space only, doesn't require root permissions
 - [x] Static build

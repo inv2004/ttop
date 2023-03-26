@@ -341,6 +341,14 @@ proc sysInfo*(): ref SysInfo =
   result.hostname = getHostName()
   result.uptimeHz = parseUptime()
 
+proc devName(s: string, o: var string, off: int): int =
+  while off+result < s.len:
+    let c = s[off+result]
+    if not (c.isAlphaNumeric or c in "-_"):
+      break
+    o.add c
+    inc result
+
 proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
   result = newOrderedTable[string, Disk]()
   catchErr(file, PROCFS / "mounts"):
@@ -362,7 +370,7 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
     for line in lines(file2):
       var tmp, read, write, total: int
       var name: string
-      doAssert scanf(line, "$s$i $s$i $w $i $i $i $i $i $i $i $i $i $i", tmp, tmp, name, tmp, tmp, tmp, read, tmp, tmp, tmp, write, tmp, total)
+      doAssert scanf(line, "$s$i $s$i ${devName} $i $i $i $i $i $i $i $i $i $i", tmp, tmp, name, tmp, tmp, tmp, read, tmp, tmp, tmp, write, tmp, total)
 
       if name notin result:
         continue
@@ -378,14 +386,6 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
       result[name].ioUsageWrite = checkedSub(ioWrite, prevInfo.disk.getOrDefault(name).ioWrite)
 
   return result
-
-proc devName(s: string, o: var string, off: int): int =
-  while off+result < s.len:
-    let c = s[off+result]
-    if not (c.isAlphaNumeric or c in "-_"):
-      break
-    o.add c
-    inc result
 
 proc netInfo(): OrderedTableRef[string, Net] =
   result = newOrderedTable[string, Net]()
@@ -499,10 +499,7 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  var name: string
-  var tmp, netIn, netOut: int
-
-  for line in lines("net_line.txt"):
-    echo line
-    echo scanf(line, "$s${devName}:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i", name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut)
-    echo name
+  for line in lines("1.txt"):
+    var tmp, read, write, total: int
+    var name: string
+    doAssert scanf(line, "$s$i $s$i ${devName} $i $i $i $i $i $i $i $i $i $i", tmp, tmp, name, tmp, tmp, tmp, read, tmp, tmp, tmp, write, tmp, total)

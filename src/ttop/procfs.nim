@@ -399,6 +399,8 @@ proc netInfo(): OrderedTableRef[string, Net] =
       var tmp, netIn, netOut: int
       if not scanf(line, "$s${devName}:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i", name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut):
         continue
+      if name.startsWith("veth"):
+        continue
 
       result[name] = Net(
         netIn: netIn.uint,

@@ -73,7 +73,7 @@ light = false            # set true for light term (default = false)
 
 [[trigger]]              # telegram example
 on_alert = true          # execute trigger on alert (true if no other on_* provided)
-on_info = true           # execute trigger on without alert (default = false)
+on_info = true           # execute trigger without alert (default = false)
 debug = false            # output stdout/err from cmd (default = false)
 cmd = '''
 read -d '' TEXT

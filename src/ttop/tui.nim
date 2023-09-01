@@ -229,6 +229,23 @@ proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
       tb.write " "
     tb.write fmt "WH: {w}x{h} "
 
+proc checkFilter(filter: string, p: PidInfo): bool =
+      for fWord in filter.split():
+        if fWord == "u:":
+          if p.user == "root":
+            result = true
+        elif fWord.startsWith("u:"):
+          if fWord[2..^1] notin p.user:
+            result = true
+        elif fWord == "d:":
+          if p.docker == "":
+            result = true
+        elif fWord.startsWith("d:"):
+          if fWord[2..^1] notin p.docker:
+            result = true
+        elif fWord notin $p.pid and fWord notin toLowerAscii(p.cmd) and fWord notin toLowerAscii(p.docker):
+          result = true
+
 proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
     filter: Option[string], statsLen: int, thr: bool) =
@@ -244,24 +261,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   tb.write fgColor
   for (_, p) in pi.pairs:
     if filter.isSome:
-      var skip = false
-      for filterStr in filter.get().split():
-        if filterStr == "u:":
-          if p.user == "root":
-            skip = true
-        elif filterStr.startsWith("u:"):
-          if filterStr[2..^1] notin p.user:
-            skip = true
-        elif filterStr == "d:":
-          if p.docker == "":
-            skip = true
-        elif filterStr.startsWith("d:"):
-          if filterStr[2..^1] notin p.docker:
-            skip = true
-        elif filterStr notin $p.pid and filterStr notin toLowerAscii(p.cmd) and filterStr notin toLowerAscii(p.docker):
-          skip = true
-      
-      if skip:
+      if checkFilter(filter.get, p):
         continue
     elif i < uint scrollY:
       inc i

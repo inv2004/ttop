@@ -1,4 +1,5 @@
 import sys
+import config
 
 import os
 import strutils
@@ -10,6 +11,8 @@ import tables
 import sequtils
 import strscans
 import options
+import net
+import jsony
 
 const PROCFS = "/proc"
 const PROCFSLEN = PROCFS.len
@@ -54,6 +57,7 @@ type PidInfo* = object
   netInDiff*, netOutDiff*: uint
   children*: seq[uint]
   threads*: int
+  docker*: string
   lvl*: int
   ord*: int
 
@@ -100,6 +104,10 @@ type FullInfo* = object
   # power*: uint
 
 type FullInfoRef* = ref FullInfo
+
+type DockerContainer = object
+  Id: string
+  Names: seq[string]
 
 proc newParseInfoError(file: string, parent: ref Exception): ref ParseInfoError =
   let parentMsg = if parent != nil: parent.msg else: "nil"
@@ -271,7 +279,24 @@ proc parseCmd(pid: uint): string =
   except CatchableError:
     discard
 
-proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
+proc devName(s: string, o: var string, off: int): int =
+  while off+result < s.len:
+    let c = s[off+result]
+    if not (c.isAlphaNumeric or c in "-_"):
+      break
+    o.add c
+    inc result
+
+proc parseDocker(pid: uint, hasDocker: var bool): string =
+  catchErr(file, PROCFS / $pid / "cgroup"):
+    var tmp0: int
+    var tmpName, dockerId: string
+    for line in lines(file):
+      if scanf(line, "$i:${devName}:/docker/${devName}", tmp0, tmpName, dockerId):
+        hasDocker = true
+        return dockerId
+
+proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo, hasDocker: var bool): PidInfo =
   try:
     result = parseStat(pid, uptimeHz, mem)
     let io = parseIO(pid)
@@ -286,6 +311,7 @@ proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     else:
       raise
   result.cmd = parseCmd(pid)
+  result.docker = parseDocker(pid, hasDocker)
 
 iterator pids*(): uint =
   catchErr(dir, PROCFS):
@@ -296,11 +322,11 @@ iterator pids*(): uint =
         except ValueError:
           discard
 
-proc pidsInfo*(uptimeHz: uint, memInfo: MemInfo): OrderedTableRef[uint, PidInfo] =
+proc pidsInfo*(uptimeHz: uint, memInfo: MemInfo, hasDocker: var bool): OrderedTableRef[uint, PidInfo] =
   result = newOrderedTable[uint, PidInfo]()
   for pid in pids():
     try:
-      result[pid] = parsePid(pid, uptimeHz, memInfo)
+      result[pid] = parsePid(pid, uptimeHz, memInfo, hasDocker)
     except ParseInfoError:
       let ex = getCurrentException()
       if ex.parent of OSError:
@@ -340,14 +366,6 @@ proc sysInfo*(): ref SysInfo =
   result.datetime = times.now()
   result.hostname = getHostName()
   result.uptimeHz = parseUptime()
-
-proc devName(s: string, o: var string, off: int): int =
-  while off+result < s.len:
-    let c = s[off+result]
-    if not (c.isAlphaNumeric or c in "-_"):
-      break
-    o.add c
-    inc result
 
 proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
   result = newOrderedTable[string, Disk]()
@@ -435,10 +453,26 @@ proc tempInfo(): Temp =
     else:
       discard
 
-# proc powerInfo(): uint =
-#   for f in walkFiles("/sys/class/power_supply/BAT*/power_now"):
-#     for line in lines(f):
-#       result += parseUInt(line)
+proc getDockerContainers(): Table[string, string] =
+  try:
+    let socket = newSocket(AF_UNIX, SOCK_STREAM, IPPROTO_IP, false)
+    socket.connectUnix(getCfg().docker)
+    socket.send("GET /containers/json HTTP/1.1\nHost: v1.42\n\n")
+    defer: socket.close()
+    var inContent = false
+    while true:
+      let str = socket.recvLine()
+      if inContent:
+        for c in str.fromJson(seq[DockerContainer]):
+          if c.Names.len > 0:
+            var name = c.Names[0]
+            removePrefix(name, '/')
+            result[c.Id] = name
+        return result
+      elif str == "\13\10":
+        inContent = true
+  except CatchableError:
+    discard
 
 proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result = newFullInfo()
@@ -449,11 +483,20 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
   result.sys = sysInfo()
   (result.cpu, result.cpus) = parseStat()
   result.mem = memInfo()
-  result.pidsInfo = pidsInfo(result.sys.uptimeHz, result.mem)
+  var hasDocker = false
+  result.pidsInfo = pidsInfo(result.sys.uptimeHz, result.mem, hasDocker)
+  if hasDocker:
+    let dockers = getDockerContainers()
+    for pid, pi in result.pidsInfo:
+      if pi.docker.len > 0:
+        if pi.docker in dockers:
+          result.pidsInfo[pid].docker = dockers[pi.docker]
+        else:
+          result.pidsInfo[pid].docker = pi.docker[0..11]
+
   result.disk = diskInfo(result.sys.datetime)
   result.net = netInfo()
   result.temp = tempInfo()
-  # result.power = powerInfo()
   prevInfo = result
 
 proc sortFunc(sortOrder: SortField, threads = false): auto =
@@ -499,9 +542,3 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     )
   elif sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
-
-when isMainModule:
-  for line in lines("1.txt"):
-    var tmp, read, write, total: int
-    var name: string
-    doAssert scanf(line, "$s$i $s$i ${devName} $i $i $i $i $i $i $i $i $i $i", tmp, tmp, name, tmp, tmp, tmp, read, tmp, tmp, tmp, write, tmp, total)

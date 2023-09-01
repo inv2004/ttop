@@ -1,4 +1,6 @@
 from config import PKGDATA
+from config import DOCKER_SOCK
+
 import osproc
 import os
 import strformat
@@ -16,6 +18,7 @@ proc createToml(file: string) =
   writeFile(file,
       """
 # light = false
+# docker = """" & DOCKER_SOCK & """"   # custom docker socket path
 
 # [data]
 # path = "/var/log/ttop"   # custom storage path (default = if exists /var/log/ttop, else ~/.cache/ttop )

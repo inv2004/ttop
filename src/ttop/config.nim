@@ -4,6 +4,7 @@ import os
 const cfgName = "ttop.toml"
 
 const PKGDATA* = "/var/log/ttop"
+const DOCKER_SOCK* = "/var/run/docker.sock"
 
 type
   Trigger* = object
@@ -13,6 +14,7 @@ type
     cmd*: string
   CfgRef* = ref object
     path*: string
+    docker*: string
     light*: bool
     triggers*: seq[Trigger]
 
@@ -38,7 +40,8 @@ proc initCfg*() =
 
   cfg = CfgRef(
     light: toml{"light"}.getBool(),
-    path: toml{"data", "path"}.getStr(getDataDir())
+    path: toml{"data", "path"}.getStr(getDataDir()),
+    docker: toml{"docker"}.getStr(DOCKER_SOCK)
   )
 
   for t in toml{"trigger"}.getElems():

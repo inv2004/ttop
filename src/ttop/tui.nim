@@ -206,9 +206,9 @@ proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
   tb.write "  ", HelpCol, "/", fgNone, " - filter "
   timeButtons(tb, cnt, forceLive)
   if forceLive or cnt == 0:
-    tb.write " ", styleBright, fgNone, "L", fgNone, " - live chart "
+    tb.write " ", styleBright, fgNone, "L", fgNone, " - live "
   else:
-    tb.write " ", HelpCol, "L", fgNone, " - live chart "
+    tb.write " ", HelpCol, "L", fgNone, " - live "
   tb.write " ", HelpCol, "Esc,Q", fgNone, " - quit "
 
   let x = tb.getCursorXPos()
@@ -231,7 +231,7 @@ proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
 
 proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     curSort: SortField, scrollX, scrollY: int,
-    filter: string, statsLen: int, thr: bool) =
+    filter: Option[string], statsLen: int, thr: bool) =
   var y = tb.getCursorYPos() + 1
   tb.write styleBright
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""")
@@ -243,10 +243,27 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   var i: uint = 0
   tb.write fgColor
   for (_, p) in pi.pairs:
-    if filter.len >= 2:
-      if filter[1..^1] notin $p.pid and filter[1..^1] notin toLowerAscii(p.cmd):
+    if filter.isSome:
+      var skip = false
+      for filterStr in filter.get().split():
+        if filterStr == "u:":
+          if p.user == "root":
+            skip = true
+        elif filterStr.startsWith("u:"):
+          if filterStr[2..^1] notin p.user:
+            skip = true
+        elif filterStr == "d:":
+          if p.docker == "":
+            skip = true
+        elif filterStr.startsWith("d:"):
+          if filterStr[2..^1] notin p.docker:
+            skip = true
+        elif filterStr notin $p.pid and filterStr notin toLowerAscii(p.cmd) and filterStr notin toLowerAscii(p.docker):
+          skip = true
+      
+      if skip:
         continue
-    if i < uint scrollY:
+    elif i < uint scrollY:
       inc i
       continue
     tb.setCursorPos offset, y
@@ -274,14 +291,18 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
     var cmd = ""
     if thr:
-      tb.write " ", ($p.threads).cut(3, true, scrollX)
+      tb.write " ", ($p.threads).cut(3, true, scrollX), "  "
       if p.lvl > 0:
-        cmd = repeat("·", p.lvl)
+        tb.write fgCyan, repeat("·", p.lvl)
+    else:
+      tb.write "  "
+    if p.docker != "":
+      tb.write fgBlue, p.docker & ":"
     if p.cmd != "":
       cmd.add p.cmd
     else:
       cmd.add p.name
-    tb.write "  ", fgCyan, cmd.cut(tb.width - 65, false, scrollX), fgColor
+    tb.write fgCyan, cmd.cut(tb.width - 65 - p.lvl - p.docker.len - 2, false, scrollX), fgColor
 
     inc y
     if y > tb.height-3:
@@ -289,15 +310,14 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       tb.write "..."
       break
 
-proc filter(tb: var TerminalBuffer, filter: string, cnt: int, forceLive: bool) =
+proc filter(tb: var TerminalBuffer, filter: Option[string], cnt: int, forceLive: bool) =
   tb.setCursorPos offset, tb.height - 1
   tb.write " ", HelpCol, "Esc,Ret", fgNone, " - Back "
   timeButtons(tb, cnt, forceLive)
-  tb.write " Filter: ", bgBlue, filter[
-      1..^1], bgNone
+  tb.write " Filter: ", bgBlue, filter.get(), bgNone
 
 proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
-            filter: string, hist: int, stats, live: seq[StatV2], blog: string,
+            filter: Option[string], hist: int, stats, live: seq[StatV2], blog: string,
                 threads, forceLive: bool) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
@@ -320,7 +340,7 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
   header(tb, info, hist, stats.len, blogShort)
   graph(tb, stats, live, blogShort, curSort, hist, forceLive)
   table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter, stats.len, threads)
-  if filter.len > 0:
+  if filter.isSome:
     filter(tb, filter, stats.len, forceLive)
   else:
     help(tb, curSort, w, h, scrollX, scrollY, stats.len, threads, forceLive)
@@ -341,7 +361,7 @@ proc tui*() =
   var (blog, hist) = moveBlog(0, "", 0, 0)
   var curSort = Cpu
   var scrollX, scrollY = 0
-  var filter = ""
+  var filter = none(string)
   var threads = false
   var forceLive = false
   var live = newSeq[StatV2]()
@@ -352,7 +372,7 @@ proc tui*() =
   var refresh = 0
   while true:
     var key = getKey()
-    if filter.len == 0:
+    if filter.isNone:
       case key
       of Key.Escape, Key.Q: return
       of Key.Space: draw = true
@@ -381,7 +401,7 @@ proc tui*() =
       of Key.C: curSort = Cpu; draw = true
       of Key.T: threads = not threads; draw = true
       of Key.L: forceLive = not forceLive; draw = true
-      of Key.Slash: filter = " "; draw = true
+      of Key.Slash: filter = some(""); draw = true
       of Key.LeftBracket:
         if not forceLive:
           (blog, hist) = moveBlog(-1, blog, hist, stats.len)
@@ -404,16 +424,34 @@ proc tui*() =
     else:
       case key
       of Key.Escape, Key.Enter:
-        filter = ""
+        filter = none(string)
         draw = true
       of Key.A .. Key.Z:
-        filter.add toLowerAscii($key)
+        filter.get().add toLowerAscii($key)
         draw = true
+      of Key.Colon:  # how to convert key to char?
+        filter.get().add ':'
+      of Key.Space:
+        filter.get().add ' '
+        draw = true        
+      of Key.Minus:
+        filter.get().add '-'
+        draw = true        
+      of Key.Underscore:
+        filter.get().add '_'
+        draw = true        
+      of Key.Comma:
+        filter.get().add ','
+        draw = true        
+      of Key.Dot:
+        filter.get().add '.'
+        draw = true        
       of Key.Zero .. Key.Nine:
-        filter.add char(key.int)
+        filter.get().add char(key.int)
+        draw = true        
       of Key.Backspace:
-        if filter.len >= 2:
-          filter = filter[0..^2]
+        if filter.get().len > 0:
+          filter.get() = filter.get[0..^2]
           draw = true
       of Key.Left:
         if scrollX > 0: dec scrollX

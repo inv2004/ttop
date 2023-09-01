@@ -231,17 +231,17 @@ proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
 
 proc checkFilter(filter: string, p: PidInfo): bool =
       for fWord in filter.split():
-        if fWord == "u:":
+        if fWord == "@":
           if p.user == "root":
             result = true
-        elif fWord.startsWith("u:"):
-          if fWord[2..^1] notin p.user:
+        elif fWord.startsWith("@"):
+          if fWord[1..^1] notin p.user:
             result = true
-        elif fWord == "d:":
+        elif fWord == "#":
           if p.docker == "":
             result = true
-        elif fWord.startsWith("d:"):
-          if fWord[2..^1] notin p.docker:
+        elif fWord.startsWith("#"):
+          if fWord[1..^1] notin p.docker:
             result = true
         elif fWord notin $p.pid and fWord notin toLowerAscii(p.cmd) and fWord notin toLowerAscii(p.docker):
           result = true
@@ -429,26 +429,33 @@ proc tui*() =
       of Key.A .. Key.Z:
         filter.get().add toLowerAscii($key)
         draw = true
-      of Key.Colon:  # how to convert key to char?
+      of Key.At:  # how to convert key to char?
+        filter.get().add '@'
+        draw = true
+      of Key.Hash:
+        filter.get().add '#'
+        draw = true
+      of Key.Colon:
         filter.get().add ':'
+        draw = true
       of Key.Space:
         filter.get().add ' '
-        draw = true        
+        draw = true
       of Key.Minus:
         filter.get().add '-'
-        draw = true        
+        draw = true
       of Key.Underscore:
         filter.get().add '_'
-        draw = true        
+        draw = true
       of Key.Comma:
         filter.get().add ','
-        draw = true        
+        draw = true
       of Key.Dot:
         filter.get().add '.'
-        draw = true        
+        draw = true
       of Key.Zero .. Key.Nine:
         filter.get().add char(key.int)
-        draw = true        
+        draw = true
       of Key.Backspace:
         if filter.get().len > 0:
           filter.get() = filter.get[0..^2]

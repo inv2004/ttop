@@ -1,5 +1,4 @@
-from config import PKGDATA
-from config import DOCKER_SOCK
+from config import PKGDATA, DOCKER_SOCK
 
 import osproc
 import os

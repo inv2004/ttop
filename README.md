@@ -7,13 +7,14 @@ System monitoring tool with TUI, historical data service and triggers
 - [x] Saving historical snapshots via systemd.timer or crontab
 - [x] Scroll via historical data
 - [x] External triggers (for notifications or other needs)
+- [x] Docker-related info
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
 - [x] TUI with critical values highlights
+- [x] Search filters: `@u` - user u, `#d` - docker d
 - [x] Temperature via `sysfs`
 - [x] User-space only, doesn't require root permissions
 - [x] Static build
 - [x] Threads tree
-- [ ] Docker-related info
 
 ## Install
 

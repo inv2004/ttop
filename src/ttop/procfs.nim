@@ -367,7 +367,7 @@ proc sysInfo*(): ref SysInfo =
   result.hostname = getHostName()
   result.uptimeHz = parseUptime()
 
-proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
+proc diskInfo*(): OrderedTableRef[string, Disk] =
   result = newOrderedTable[string, Disk]()
   catchErr(file, PROCFS / "mounts"):
     for line in lines(file):
@@ -376,6 +376,8 @@ proc diskInfo*(dt: DateTime): OrderedTableRef[string, Disk] =
           continue
         let parts = line.split(maxsplit = 2)
         let name = parts[0]
+        if name in result:
+          continue
         let path = parts[1]
         var stat: Statvfs
         if statvfs(cstring path, stat) != 0:
@@ -439,19 +441,21 @@ proc findMaxTemp(dir: string): Option[float64] =
     return some(maxTemp / 1000)
 
 proc tempInfo(): Temp =
-  var cnt = 0
-  for file in walkFiles("/sys/class/hwmon/hwmon*/name"):
-    case readFile(file)
-    of "coretemp\n", "k10temp\n":
-      result.cpu = findMaxTemp(file)
-      cnt.inc
-      if cnt == 2: break
-    of "nvme\n":
-      result.nvme = findMaxTemp(file)
-      cnt.inc
-      if cnt == 2: break
-    else:
-      discard
+  result.cpu = some(35.0)
+  result.nvme = some(27.0)
+  # var cnt = 0
+  # for file in walkFiles("/sys/class/hwmon/hwmon*/name"):
+  #   case readFile(file)
+  #   of "coretemp\n", "k10temp\n":
+  #     result.cpu = findMaxTemp(file)
+  #     cnt.inc
+  #     if cnt == 2: break
+  #   of "nvme\n":
+  #     result.nvme = findMaxTemp(file)
+  #     cnt.inc
+  #     if cnt == 2: break
+  #   else:
+  #     discard
 
 proc getDockerContainers(): Table[string, string] =
   try:
@@ -494,7 +498,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
         else:
           result.pidsInfo[pid].docker = pi.docker[0..11]
 
-  result.disk = diskInfo(result.sys.datetime)
+  result.disk = diskInfo()
   result.net = netInfo()
   result.temp = tempInfo()
   prevInfo = result
@@ -542,3 +546,7 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     )
   elif sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
+
+when isMainModule:
+  for k, v in diskInfo():
+    echo k, ": ", v

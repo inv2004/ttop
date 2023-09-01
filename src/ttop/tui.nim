@@ -435,6 +435,12 @@ proc tui*() =
       of Key.Hash:
         filter.get().add '#'
         draw = true
+      of Key.Slash:
+        filter.get().add '/'
+        draw = true
+      of Key.Backslash:
+        filter.get().add '\\'
+        draw = true
       of Key.Colon:
         filter.get().add ':'
         draw = true

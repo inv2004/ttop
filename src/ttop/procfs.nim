@@ -441,21 +441,19 @@ proc findMaxTemp(dir: string): Option[float64] =
     return some(maxTemp / 1000)
 
 proc tempInfo(): Temp =
-  result.cpu = some(35.0)
-  result.nvme = some(27.0)
-  # var cnt = 0
-  # for file in walkFiles("/sys/class/hwmon/hwmon*/name"):
-  #   case readFile(file)
-  #   of "coretemp\n", "k10temp\n":
-  #     result.cpu = findMaxTemp(file)
-  #     cnt.inc
-  #     if cnt == 2: break
-  #   of "nvme\n":
-  #     result.nvme = findMaxTemp(file)
-  #     cnt.inc
-  #     if cnt == 2: break
-  #   else:
-  #     discard
+  var cnt = 0
+  for file in walkFiles("/sys/class/hwmon/hwmon*/name"):
+    case readFile(file)
+    of "coretemp\n", "k10temp\n":
+      result.cpu = findMaxTemp(file)
+      cnt.inc
+      if cnt == 2: break
+    of "nvme\n":
+      result.nvme = findMaxTemp(file)
+      cnt.inc
+      if cnt == 2: break
+    else:
+      discard
 
 proc getDockerContainers(): Table[string, string] =
   try:

@@ -272,7 +272,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     if p.user == "":
       tb.write " ", fgMagenta, int(p.uid).cut(8, false, scrollX), fgColor
     else:
-      tb.write " ", fgYellow, p.user.cut(8, false, scrollX), fgColor
+      tb.write " ", fgCyan, p.user.cut(8, false, scrollX), fgColor
     if p.mem >= rssLimit:
       tb.write bgRed
     tb.write " ", p.rss.formatS().cut(10, true, scrollX), bgNone

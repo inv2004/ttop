@@ -48,7 +48,7 @@ cd ttop
 nimble -d:release build
 ```
 
-### Notification
+### Triggers / Notifications
 * stmp support was removed in prev version by the reason that static binary with ssl is more that 3Mb
 
 From v0.8.1 you can trigger external tool, for example curl, to send notifications

@@ -2,10 +2,6 @@ import strformat
 import times
 
 proc formatP*(f: float, left = false): string =
-  # if f < 10.0:
-  #   fmt "{f:.1f}"
-  # else:
-  #   fmt "{f.int:3}"
   if f >= 100.0:
     fmt"{f:.0f}"
   elif left:
@@ -14,20 +10,15 @@ proc formatP*(f: float, left = false): string =
     fmt"{f:4.1f}"
 
 proc formatSPair*(b: int): (float, string) =
-  if b < 1024:
-    (b.float, "b")
-  elif 1024 <= b and b < 1024*1024:
-    (b/1024, "KB")
-  elif 1024*1024 <= b and b < 1024*1024*1024:
-    (b/(1024*1024), "MB")
-  elif 1024*1024*1024 <= b and b < 1024*1024*1024*1024:
-    (b/(1024*1024*1024), "GB")
-  elif 1024*1024*1024*1024 <= b and b < 1024*1024*1024*1024*1024:
-    (b/(1024*1024*1024*1024), "TB")
-  elif 1024*1024*1024*1024*1024 <= b and b < 1024*1024*1024*1024*1024*1024:
-    (b/(1024*1024*1024*1024*1024), "PB")
-  else:
-    (b.float, ".")
+  const postStr = ["b", "KB", "MB", "GB", "TB", "PB"]
+
+  var x = b * 10
+  for i, v in postStr:
+    if x < 10240:
+      return (x / 10, v)
+    x = (x+512) div 1024
+
+  return (b.float, ".")
 
 proc formatS*(a: int): string =
   let (n, s) = formatSPair(a)
@@ -95,4 +86,4 @@ when isMainModule:
   echo "|", 2000512.formatS, "|"
   echo "|", formatS(3156216320.uint, 12400328704.uint), "|"
   echo "|", formatS(156216320.uint, 12400328704.uint), "|"
-
+  echo "|", formatS(320.uint, 12400328704.uint), "|"

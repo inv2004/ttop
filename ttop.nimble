@@ -1,6 +1,6 @@
 # Package
 
-version = "1.2.0"
+version = "1.2.2"
 author = "inv2004"
 description = "Monitoring tool with historical snapshots and alerts"
 license = "MIT"
@@ -9,7 +9,7 @@ bin = @["ttop"]
 
 # Dependencies
 
-requires "nim >= 1.6.12"
+requires "nim >= 1.6.10"
 
 requires "illwill"
 requires "zippy"

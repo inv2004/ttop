@@ -1,3 +1,7 @@
+[![Build](https://github.com/inv2004/ttop/actions/workflows/build.yaml/badge.svg?branch=v1.2.2)](https://github.com/inv2004/ttop/actions/workflows/build.yaml)
+![AUR version](https://img.shields.io/aur/version/ttop)
+[![Github All Releases](https://img.shields.io/github/downloads/inv2004/ttop/total.svg)](https://github.com/inv2004/ttop/releases/latest)
+
 # ttop
 
 System monitoring tool with historical data service, triggers and top-like TUI

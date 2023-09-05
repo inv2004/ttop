@@ -2,7 +2,7 @@
 ![AUR version](https://img.shields.io/aur/version/ttop)
 [![Github All Releases](https://img.shields.io/github/downloads/inv2004/ttop/total.svg)](https://github.com/inv2004/ttop/releases/latest)
 
-# ttop
+# ```ttop```
 
 System monitoring tool with historical data service, triggers and top-like TUI
 

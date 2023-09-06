@@ -1,5 +1,6 @@
 [![Build](https://github.com/inv2004/ttop/actions/workflows/build.yaml/badge.svg?branch=v1.2.2)](https://github.com/inv2004/ttop/actions/workflows/build.yaml)
-![AUR version](https://img.shields.io/aur/version/ttop)
+[![GitHub release (with filter)](https://img.shields.io/github/v/release/inv2004/ttop)](https://github.com/inv2004/ttop/releases/latest)
+[![AUR version](https://img.shields.io/aur/version/ttop)](https://aur.archlinux.org/packages/ttop)
 [![Github All Releases](https://img.shields.io/github/downloads/inv2004/ttop/total.svg)](https://github.com/inv2004/ttop/releases/latest)
 
 # ```ttop```

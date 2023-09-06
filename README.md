@@ -18,7 +18,7 @@ System monitoring tool with historical data service, triggers and top-like TUI
 - [x] External triggers (for notifications or other needs)
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
       
-   * by default you see full day on the chart, detect the moment of the spike and move to it for a detailed analysis
+   * by default you see full day on the chart, see the moment of the spike and move into it for a detailed analysis
 
 - [x] TUI with critical values highlights
 - [x] Search filters: `@u` - user u, `#d` - docker d

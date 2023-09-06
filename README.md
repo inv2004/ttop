@@ -11,6 +11,9 @@ System monitoring tool with historical data service, triggers and top-like TUI
 
 
 - [x] Saving historical snapshots via systemd.timer or crontab
+      
+    * It is the main diff from `htop`, `top`, `btop` and etc
+
 - [x] Scroll via historical data
 - [x] External triggers (for notifications or other needs)
 - [x] Docker-related info

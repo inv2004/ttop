@@ -16,14 +16,17 @@ System monitoring tool with historical data service, triggers and top-like TUI
 
 - [x] Scroll via historical data
 - [x] External triggers (for notifications or other needs)
-- [x] Docker-related info
 - [x] Ascii graph of historical stats (via https://github.com/Yardanico/asciigraph)
+      
+   * by default you see full day on the chart, detect the moment of the spike and move to it for a detailed analysis
+
 - [x] TUI with critical values highlights
 - [x] Search filters: `@u` - user u, `#d` - docker d
 - [x] Temperature via `sysfs`
 - [x] User-space only, doesn't require root permissions
-- [x] Static build
+- [x] Docker-related info
 - [x] Threads tree
+- [x] Static build
 
 ## Install
 

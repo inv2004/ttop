@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+    branches:
+    - main
     tags:
     - '*'
 
@@ -15,6 +17,7 @@ jobs:
       - uses: jiro4989/setup-nim-action@v1
       - run: nim --version && nimble -y -d install && nimble static && nimble staticdebug
       - uses: ncipollo/release-action@v1
+        if: contains(github.ref, 'refs/tags/v')
         with:
           artifacts: "ttop,ttop-debug"
           makeLatest: true

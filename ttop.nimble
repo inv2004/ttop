@@ -9,7 +9,7 @@ bin = @["ttop"]
 
 # Dependencies
 
-requires "nim >= 1.6.12"
+requires "nim >= 1.6.10"
 
 requires "https://github.com/inv2004/illwill#nim_1_6_10"
 requires "zippy"

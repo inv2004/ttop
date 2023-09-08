@@ -1,6 +1,6 @@
 # Package
 
-version = "1.2.2"
+version = "1.2.4"
 author = "inv2004"
 description = "Monitoring tool with historical snapshots and alerts"
 license = "MIT"
@@ -20,7 +20,7 @@ requires "https://github.com/inv2004/jsony#non_quoted_key"
 const lmDir = "lm-sensors"
 
 task static, "build static release":
-  exec "nim -d:release -d:NimblePkgVersion="&version&" --opt:size --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passC:-flto --passL:'-flto -static' -o:ttop c src/ttop.nim"
+  exec "nim -d:release -d:NimblePkgVersion="&version&" --opt:size --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passC:-flto --passL:'-flto -static' -o:ttop c src/ttop.nim && strip -s ttop"
 
 task staticdebug, "build static debug":
   exec "nim -d:debug -d:NimblePkgVersion="&version&" --gcc.exe:musl-gcc --gcc.linkerexe:musl-gcc --passL:-static -o:ttop-debug c src/ttop.nim"

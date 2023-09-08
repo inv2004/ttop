@@ -289,11 +289,12 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
     tb.write " ", p.uptime.formatT().cut(8, false, scrollX)
 
+    let lvl = p.parents.len
     var cmd = ""
     if thr:
       tb.write " ", ($p.threads).cut(3, true, scrollX), "  "
-      if p.lvl > 0:
-        tb.write fgCyan, repeat("·", p.lvl)
+      if lvl > 0:
+        tb.write fgCyan, repeat("·", lvl)
     else:
       tb.write "  "
     if p.docker != "":
@@ -302,7 +303,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       cmd.add p.cmd
     else:
       cmd.add p.name
-    tb.write fgCyan, cmd.cut(tb.width - 65 - p.lvl - p.docker.len - 2, false, scrollX), fgColor
+    tb.write fgCyan, cmd.cut(tb.width - 65 - lvl - p.docker.len - 2, false, scrollX), fgColor
 
     inc y
     if y > tb.height-3:

@@ -8,7 +8,7 @@ import posix_utils
 import nativesockets
 import times
 import tables
-import sequtils
+import algorithm
 import strscans
 import options
 import net
@@ -40,6 +40,7 @@ type MemInfo* = object
 type PidInfo* = object
   pid*: uint
   uid*: Uid
+  ppid*: uint
   user*: string
   name*: string
   state*: string
@@ -55,11 +56,9 @@ type PidInfo* = object
   ioReadDiff*, ioWriteDiff*: uint
   netIn*, netOut*: uint
   netInDiff*, netOutDiff*: uint
-  children*: seq[uint]
+  parents*:seq[uint]  # generated from ppid, used to build tree
   threads*: int
   docker*: string
-  lvl*: int
-  ord*: int
 
 type CpuInfo* = object
   total*: uint
@@ -203,14 +202,6 @@ proc memInfo(): MemInfo =
       of "SwapFree": result.SwapFree = parseSize(parts[1])
     result.MemDiff = int(result.MemFree) - int(prevInfo.mem.MemFree)
 
-proc parseTasks(pid: uint): seq[uint] =
-  catchErr(file, PROCFS / $pid / "task/*/children"):
-    for c in walkFiles(file):
-      for line in lines(c):
-        if line.len > 0:
-          result.add line.strip().split().map(parseUInt)
-        break
-
 proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
   catchErr(file, PROCFS / $pid / "stat"):
     let stat = stat(file)
@@ -227,14 +218,15 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     doAssert scanf(buf[0..<cmdL], "$i", pid)
     result.name = buf[1+cmdL..<cmdR]
 
-    var tmp, utime, stime, starttime, vsize, rss, threads: int
+    var tmp, ppid, utime, stime, starttime, vsize, rss, threads: int
     doAssert scanf(buf[1+cmdR..^1], " $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
-                      result.state, tmp, tmp, tmp, tmp, tmp, tmp, tmp,          # 10
+                      result.state, ppid, tmp, tmp, tmp, tmp, tmp, tmp,          # 10
                       tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
                       tmp, starttime, vsize, rss)
 
     result.name.escape()
     result.pid = pid.uint
+    result.ppid = ppid.uint
     result.vsize = vsize.uint
     result.rss = pageSize * rss.uint
     result.threads = threads
@@ -253,8 +245,6 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
 
     result.cpu = checkedDiv(100 * checkedSub(result.cpuTime, prevCpuTime), delta)
     result.mem = checkedDiv(100 * result.rss, mem.MemTotal)
-
-    result.children = parseTasks(result.pid)
 
 proc parseIO(pid: uint): (uint, uint, uint, uint) =
   catchErr(file, PROCFS / $pid / "io"):
@@ -514,37 +504,37 @@ proc sortFunc(sortOrder: SortField, threads = false): auto =
   of Cpu: return proc(a, b: (uint, PidInfo)): int =
     cmp b[1].cpu, a[1].cpu
 
-proc mkTree(p: uint, pp: OrderedTableRef[uint, PidInfo], lvl, i: int,
-     sortOrder: SortField): int =
-
-  result = i
-
-  let o = newOrderedTable[uint, PidInfo]()
-  for c in pp[p].children:
-    if c in pp:
-      o[c] = pp[c]
-
-  sort(o, sortFunc(sortOrder))
-
-  pp[p].lvl = lvl
-  pp[p].ord = result
-  inc result
-  for c in o.keys():
-    result = mkTree(c, pp, 1+lvl, result, sortOrder)
-    inc result
+proc genParents(p: OrderedTableRef[uint, PidInfo]) =
+  for k, v in p:
+    if v.parents.len > 0:
+      continue
+    var s: seq[uint] = @[]
+    var x = v.ppid
+    while x in p:
+      s.add x
+      x = p[x].ppid
+    let parents = s.reversed()
+    p[k].parents = parents
 
 proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
   if threads:
-    var r = 0
-    for p, v in info.pidsInfo:
-      if v.ord == 0:
-        r = mkTree(p, info.pidsInfo, 0, r, sortOrder)
-    sort(info.pidsInfo, proc(a, b: (uint, PidInfo)): int =
-      cmp(a[1].ord, b[1].ord)
+    info.pidsInfo.genParents()
+    let cmpFn = sortFunc(sortOrder, false)
+    info.pidsInfo.sort(proc(a, b: (uint, PidInfo)): int =
+      var i = 0
+      while i < a[1].parents.len and i < b[1].parents.len:
+        result = cmp(a[1].parents[i], b[1].parents[i])
+        if result == 0:
+          inc i
+        else:
+          return result
+      result = cmp(a[1].parents.len, b[1].parents.len)
+      if result == 0:
+        result = cmpFn((a[0], info.pidsInfo[a[0]]), (b[0], info.pidsInfo[b[0]]))
     )
+
   elif sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  for k, v in diskInfo():
-    echo k, ": ", v
+  echo "ok"

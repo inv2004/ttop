@@ -84,13 +84,11 @@ proc infoFromGzip(buf: string): FullInfo =
   except JsonError:
     return to[FullInfo](jsonStr)
 
-proc hist*(ii: int, blog: string, live: var seq[StatV2]): (FullInfoRef, seq[StatV2]) =
+proc hist*(ii: int, blog: string, live: var seq[StatV2], forceLive: bool): (FullInfoRef, seq[StatV2]) =
   let fi = fullInfo()
-  if ii == 0:
+  if ii == 0 or forceLive:
     result[0] = fi
-    live.add genStat(fi)
-  else:
-    live.add genStat(fi)
+  live.add genStat(fi)
 
   live.delete((0..live.high - 1000))
 
@@ -106,7 +104,7 @@ proc hist*(ii: int, blog: string, live: var seq[StatV2]): (FullInfoRef, seq[Stat
     let sz = s.readUInt32().int
     buf = s.readStr(sz)
     discard s.readUInt32()
-    if ii == result[1].len:
+    if not forceLive and ii == result[1].len:
       new(result[0])
       result[0][] = infoFromGzip(buf)
 
@@ -120,7 +118,7 @@ proc hist*(ii: int, blog: string, live: var seq[StatV2]): (FullInfoRef, seq[Stat
 
 proc histNoLive*(ii: int, blog: string): (FullInfoRef, seq[StatV2]) =
   var live = newSeq[StatV2]()
-  hist(ii, blog, live)
+  hist(ii, blog, live, false)
 
 proc saveBlog(): string =
   let dir = getCfg().path

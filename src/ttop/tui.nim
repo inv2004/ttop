@@ -366,7 +366,7 @@ proc tui*() =
   var threads = false
   var forceLive = false
   var live = newSeq[StatV2]()
-  var (info, stats) = hist(hist, blog, live)
+  var (info, stats) = hist(hist, blog, live, forceLive)
   redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
       threads, forceLive)
 
@@ -401,7 +401,7 @@ proc tui*() =
       of Key.N: curSort = Name; draw = true
       of Key.C: curSort = Cpu; draw = true
       of Key.T: threads = not threads; draw = true
-      of Key.L: forceLive = not forceLive; draw = true
+      of Key.L: forceLive = not forceLive; reload = true
       of Key.Slash: filter = some(""); draw = true
       of Key.LeftBracket:
         if not forceLive:
@@ -502,7 +502,7 @@ proc tui*() =
       if refresh != 10:
         (info, stats) = histNoLive(hist, blog)
       else:
-        (info, stats) = hist(hist, blog, live)
+        (info, stats) = hist(hist, blog, live, forceLive)
       draw = true
 
     if draw:

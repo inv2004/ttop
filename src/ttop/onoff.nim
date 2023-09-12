@@ -155,6 +155,7 @@ proc onOffSystemd(enable: bool, interval: uint) =
     if isAdmin():
       echo "mkdir ", PKGDATA
       createDir(PKGDATA)
+    discard cmd &"systemctl{user} start '{unit}.service'"
   else:
     discard cmd &"systemctl{user} stop '{unit}.timer'"
     discard cmd &"systemctl{user} disable --now '{unit}.timer'"
@@ -178,8 +179,8 @@ proc filter(input: string): string =
 proc onOffCron(enable: bool, interval: uint) =
   let output = cmd("crontab -l", true)
   var input = filter(output)
+  let app = getAppFilename()
   if enable:
-    let app = getAppFilename()
     input &= &"*/{interval} * * * * {app} -s\n"
     discard cmd("crontab", false, input)
   else:
@@ -188,6 +189,8 @@ proc onOffCron(enable: bool, interval: uint) =
     else:
       discard cmd("crontab", false, input)
   discard cmd("crontab -l", true)
+  if enable:
+    discard cmd &"{app} -s"
 
 proc onoff*(enable: bool, interval: uint = 10) =
   let isSysD =
@@ -205,4 +208,3 @@ proc onoff*(enable: bool, interval: uint = 10) =
 
 when isMainModule:
   createConfig(true, 10)
-

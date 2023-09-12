@@ -67,7 +67,7 @@ From v0.8.1 you can trigger external tool, for example curl, to send notificatio
 ![image](https://user-images.githubusercontent.com/4949069/215402008-eb0325f9-3e6e-4908-a6aa-d7b3b64f09db.png)
 
 ### Config example
-`~/.config/ttop.toml` or `/etc/ttop.toml`
+`~/.config/ttop/ttop.toml` or `/etc/ttop.toml`
 
 #### My default server's config
 

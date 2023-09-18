@@ -1,6 +1,6 @@
 # Package
 
-version = "1.2.4"
+version = "1.2.5"
 author = "inv2004"
 description = "Monitoring tool with historical snapshots and alerts"
 license = "MIT"
@@ -11,7 +11,7 @@ bin = @["ttop"]
 
 requires "nim >= 1.6.10"
 
-requires "https://github.com/inv2004/illwill#nim_1_6_10"
+requires "illwill"
 requires "zippy"
 requires "asciigraph"
 requires "parsetoml"

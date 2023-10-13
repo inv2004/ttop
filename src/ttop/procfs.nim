@@ -484,7 +484,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
         if pi.docker in dockers:
           result.pidsInfo[pid].docker = dockers[pi.docker]
         else:
-          result.pidsInfo[pid].docker = pi.docker[0..11]
+          result.pidsInfo[pid].docker = pi.docker
 
   result.disk = diskInfo()
   result.net = netInfo()

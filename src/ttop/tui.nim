@@ -183,9 +183,9 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string, sort:
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int, forceLive: bool) =
   if cnt == 0:
-    tb.write " ", styleDim, "[],{} - timeshift ", styleBright, fgNone
+    tb.write " ", styleDim, "[]", fgNone, ",", HelpCol, "{} - timeshift ", styleBright, fgNone
   else:
-    tb.write " ", HelpCol, "[],{}", fgNone, " - timeshift "
+    tb.write " ", HelpCol, "[]", fgNone, ",", HelpCol, "{}", fgNone, " - timeshift "
 
 proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
     cnt: int, thr, forceLive: bool) =
@@ -235,7 +235,10 @@ proc checkFilter(filter: string, p: PidInfo): bool =
           if p.user == "root":
             result = true
         elif fWord.startsWith("@"):
-          if fWord[1..^1] notin p.user:
+          if p.user == "":
+            if fWord[1..^1] notin ($p.uid):
+              result = true
+          elif fWord[1..^1] notin p.user:
             result = true
         elif fWord == "#":
           if p.docker == "":
@@ -313,8 +316,9 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
 proc filter(tb: var TerminalBuffer, filter: Option[string], cnt: int, forceLive: bool) =
   tb.setCursorPos offset, tb.height - 1
-  tb.write " ", HelpCol, "Esc,Ret", fgNone, " - Back "
   timeButtons(tb, cnt, forceLive)
+  tb.write " ", HelpCol, "@", fgNone, ",", HelpCol, "#", fgNone, " - by user,docker"
+  tb.write " ", HelpCol, "Esc", fgNone, ",", HelpCol, "Ret", fgNone, " - Back "
   tb.write " Filter: ", bgBlue, filter.get(), bgNone
 
 proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
@@ -518,4 +522,4 @@ proc tui*() =
 
     draw = false
     reload = false
-    
+

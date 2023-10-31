@@ -452,17 +452,30 @@ proc getDockerContainers(): Table[string, string] =
     socket.send("GET /containers/json HTTP/1.1\nHost: v1.42\n\n")
     defer: socket.close()
     var inContent = false
+    var chunked = false
+    var content = ""
     while true:
       let str = socket.recvLine()
       if inContent:
-        for c in str.fromJson(seq[DockerContainer]):
-          if c.Names.len > 0:
-            var name = c.Names[0]
-            removePrefix(name, '/')
-            result[c.Id] = name
-        return result
+        if chunked:
+          let sz = fromHex[int](str)
+          if sz == 0:
+            break
+          content.add socket.recv(fromHex[int](str), 100)
+          inContent = false
+        else:
+          content.add str
+      elif "Transfer-Encoding: chunked" == str:
+        chunked = true
       elif str == "\13\10":
         inContent = true
+      elif str == "":
+        break
+    for c in content.fromJson(seq[DockerContainer]):
+      if c.Names.len > 0:
+        var name = c.Names[0]
+        removePrefix(name, '/')
+        result[c.Id] = name
   except CatchableError:
     discard
 
@@ -484,7 +497,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef =
         if pi.docker in dockers:
           result.pidsInfo[pid].docker = dockers[pi.docker]
         else:
-          result.pidsInfo[pid].docker = pi.docker
+          result.pidsInfo[pid].docker = pi.docker[0..min(11, pi.docker.high)]
 
   result.disk = diskInfo()
   result.net = netInfo()
@@ -537,4 +550,6 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 when isMainModule:
-  echo "ok"
+  for k, v in getDockerContainers():
+    echo k, ": ", v
+  echo fullInfo().cpu

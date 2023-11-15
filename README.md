@@ -69,14 +69,14 @@ From v0.8.1 you can trigger external tool, for example curl, to send notificatio
 ### Config example
 `~/.config/ttop/ttop.toml` or `/etc/ttop.toml`
 
-#### My default server's config
+#### My own server's config
 
 ```toml
 [[trigger]]
 cmd = "$HOME/bin/tel.sh"
 ```
 
-#### Config with all parameters described
+#### Config with all parameters described (you do not need them all)
 
 ```toml
 light = false            # set true for light term (default = false)

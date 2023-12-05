@@ -78,6 +78,8 @@ cmd = "$HOME/bin/tel.sh"
 
 #### Config with all parameters described
 
+* you do not need them all, or maybe you do not need it all
+
 ```toml
 light = false            # set true for light term (default = false)
 

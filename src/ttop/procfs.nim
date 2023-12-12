@@ -461,10 +461,11 @@ proc getDockerContainers(): Table[string, string] =
           let sz = fromHex[int](str)
           if sz == 0:
             break
-          content.add socket.recv(fromHex[int](str), 100)
+          content.add socket.recv(sz, 100)
           inContent = false
         else:
           content.add str
+          break
       elif "Transfer-Encoding: chunked" == str:
         chunked = true
       elif str == "\13\10":

@@ -40,7 +40,7 @@ yay -S ttop             # enables systemd.timers automatically
 ```bash
 wget https://github.com/inv2004/ttop/releases/latest/download/ttop
 chmod +x ttop
-mv ttop ~/.local/bin/          # add into PATH if necessary
+mv ttop ~/.local/bin/   # add into PATH if necessary
 ttop --on               # Optional: enable data collector in user's systemd.timers or crontab
 ```
 

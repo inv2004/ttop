@@ -40,14 +40,14 @@ yay -S ttop             # enables systemd.timers automatically
 ```bash
 wget https://github.com/inv2004/ttop/releases/latest/download/ttop
 chmod +x ttop
-mv ttop ~/bin/          # add into PATH if necessary
+mv ttop ~/.local/bin/          # add into PATH if necessary
 ttop --on               # Optional: enable data collector in user's systemd.timers or crontab
 ```
 
 ### Uninstall
 ```bash
 ttop --off
-rm ~/bin/ttop
+rm ~/.local/bin/ttop
 ```
 
 ### Build from source
@@ -73,7 +73,7 @@ From v0.8.1 you can trigger external tool, for example curl, to send notificatio
 
 ```toml
 [[trigger]]
-cmd = "$HOME/bin/tel.sh"
+cmd = "$HOME/.local/bin/tel.sh"
 ```
 
 #### Config with all parameters described

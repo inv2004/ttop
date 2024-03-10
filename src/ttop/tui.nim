@@ -18,6 +18,27 @@ const fgDarkColor = fgWhite
 const fgLightColor = fgBlack
 var fgColor = fgDarkColor
 
+const offset = 2
+const HelpCol = fgGreen
+
+const sleepMs = 25
+const reloadRefresh = 1000 div sleepMs
+
+type
+  Tui = ref object
+    sort = Cpu
+    scrollX = 0
+    scrollY = 0
+    filter = none(string)
+    threads = false
+    forceLive = false
+    draw = false
+    reload = false
+    quit = false
+    hist: int
+    blog: string
+    refresh = 0
+
 proc stopTui() {.noconv.} =
   illwillDeinit()
   setCursorXPos(0)
@@ -26,9 +47,6 @@ proc stopTui() {.noconv.} =
 proc exitProc() {.noconv.} =
   stopTui()
   quit(0)
-
-const offset = 2
-const HelpCol = fgGreen
 
 proc writeR(tb: var TerminalBuffer, s: string, rOffset = 0) =
   let x = terminalWidth() - s.len - offset - rOffset
@@ -51,15 +69,14 @@ proc temp(tb: var TerminalBuffer, value: Option[float64], isLimit: bool) =
     tb.writeR formatC(value.get), -1
     tb.write bgNone
 
-proc header(tb: var TerminalBuffer, info: FullInfoRef, hist, cnt: int,
-    blog: string) =
+proc header(tui: Tui, tb: var TerminalBuffer, info: FullInfoRef, cnt: int, blog: string) =
   let mi = info.mem
   tb.setCursorPos offset, 1
   tb.write bgCyan, info.sys.hostname, fgWhite, ": ",
       info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
-  if hist > 0:
-    tb.write fmt"    {blog}: {hist} / {cnt} "
+  if tui.hist > 0:
+    tb.write fmt"    {blog}: {tui.hist} / {cnt} "
   elif blog == "":
     tb.write fmt"    autoupdate    log: empty "
   else:
@@ -146,30 +163,29 @@ proc graphData(stats: seq[StatV2], sort: SortField, width: int): seq[float] =
     let diff = width - stats.len
     result.insert(float(0).repeat(diff), 0)
 
-proc graph(tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string, sort: SortField,
-           hist: int, forceLive: bool) =
+proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string) =
   tb.setCursorPos offset, tb.getCursorYPos()+1
   var y = tb.getCursorYPos() + 1
   tb.setCursorPos offset, y
   let w = terminalWidth()
   let graphWidth = w - 12
   let data =
-    if forceLive or stats.len == 0: graphData(live, sort, graphWidth)
-    else: graphData(stats, sort, 0)
+    if tui.forceLive or stats.len == 0: graphData(live, tui.sort, graphWidth)
+    else: graphData(stats, tui.sort, 0)
   try:
     let gLines = plot(data, width = graphWidth, height = 4).split("\n")
     y += 5 - gLines.len
     for i, g in gLines:
       tb.setCursorPos offset-1, y+i
       tb.write g
-    if hist > 0 and not forceLive:
+    if tui.hist > 0 and not tui.forceLive:
       let cc = if data.len > 2: data.len - 1 else: 1
-      let x = ((hist-1) * (w-11-2)) div (cc)
+      let x = ((tui.hist-1) * (w-11-2)) div (cc)
       tb.setCursorPos offset + 8 + x, tb.getCursorYPos() + 1
       tb.write styleBright, "^"
     else:
       tb.setCursorPos offset, tb.getCursorYPos() + 1
-      if stats.len == 0 or forceLive:
+      if stats.len == 0 or tui.forceLive:
         if stats.len == 0:
           tb.writeR("No historical stats found ", 5)
         tb.write bgGreen
@@ -181,31 +197,30 @@ proc graph(tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string, sort:
     tb.write("error in graph: " & $deduplicate(data))
     tb.setCursorPos offset, tb.getCursorYPos() + 1
 
-proc timeButtons(tb: var TerminalBuffer, cnt: int, forceLive: bool) =
+proc timeButtons(tb: var TerminalBuffer, cnt: int) =
   if cnt == 0:
     tb.write " ", styleDim, "[]", fgNone, ",", HelpCol, "{} - timeshift ", styleBright, fgNone
   else:
     tb.write " ", HelpCol, "[]", fgNone, ",", HelpCol, "{}", fgNone, " - timeshift "
 
-proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
-    cnt: int, thr, forceLive: bool) =
+proc help(tui: Tui, tb: var TerminalBuffer, w, h, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
 
   tb.write fgNone, " order by"
   for x in SortField:
-    if x == curSort:
+    if x == tui.sort:
       tb.write " ", styleBright, fgNone, $x
     else:
       tb.write " ", HelpCol, $($x)[0], fgCyan, ($x)[1..^1]
     # tb.setCursorXPos 0+tb.getCursorXPos()
 
-  if thr:
+  if tui.threads:
     tb.write "  ", styleBright, fgNone, "T", fgNone, " - tree"
   else:
     tb.write "  ", HelpCol, "T", fgNone, " - tree"
   tb.write "  ", HelpCol, "/", fgNone, " - filter "
-  timeButtons(tb, cnt, forceLive)
-  if forceLive or cnt == 0:
+  timeButtons(tb, cnt)
+  if tui.forceLive or cnt == 0:
     tb.write " ", styleBright, fgNone, "L", fgNone, " - live "
   else:
     tb.write " ", HelpCol, "L", fgNone, " - live "
@@ -214,16 +229,16 @@ proc help(tb: var TerminalBuffer, curSort: SortField, w, h, scrollX, scrollY,
   let x = tb.getCursorXPos()
 
   if x + 26 < w:
-    if scrollX > 0:
+    if tui.scrollX > 0:
       tb.setCursorXPos(w - 26)
-      tb.write fmt" X: {scrollX}"
-    if scrollY > 0:
+      tb.write fmt" X: {tui.scrollX}"
+    if tui.scrollY > 0:
       tb.setCursorXPos(w - 21)
-      tb.write fmt" Y: {scrollY}"
+      tb.write fmt" Y: {tui.scrollY}"
 
   if x + 15 < w:
     tb.setCursorXPos(w - 15)
-    if scrollX > 0 or scrollY > 0:
+    if tui.scrollX > 0 or tui.scrollY > 0:
       tb.write HelpCol, "z", fgNone
     else:
       tb.write " "
@@ -249,13 +264,11 @@ proc checkFilter(filter: string, p: PidInfo): bool =
         elif fWord notin $p.pid and fWord notin toLowerAscii(p.cmd) and fWord notin toLowerAscii(p.docker):
           result = true
 
-proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
-    curSort: SortField, scrollX, scrollY: int,
-    filter: Option[string], statsLen: int, thr: bool) =
+proc table(tui: Tui,tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo], statsLen: int) =
   var y = tb.getCursorYPos() + 1
   tb.write styleBright
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""")
-  if thr:
+  if tui.threads:
     tb.write fmt""" {"THR":>3} """
   if tb.width - 63 > 0:
     tb.write ' '.repeat(tb.width-63), bgNone
@@ -263,39 +276,39 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   var i: uint = 0
   tb.write fgColor
   for (_, p) in pi.pairs:
-    if filter.isSome:
-      if checkFilter(filter.get, p):
+    if tui.filter.isSome:
+      if checkFilter(tui.filter.get, p):
         continue
-    elif i < uint scrollY:
+    elif i < uint tui.scrollY:
       inc i
       continue
     tb.setCursorPos offset, y
     tb.write p.state
-    tb.write " ", p.pid.cut(6, true, scrollX)
+    tb.write " ", p.pid.cut(6, true, tui.scrollX)
     if p.user == "":
-      tb.write " ", fgMagenta, int(p.uid).cut(8, false, scrollX), fgColor
+      tb.write " ", fgMagenta, int(p.uid).cut(8, false, tui.scrollX), fgColor
     else:
-      tb.write " ", fgCyan, p.user.cut(8, false, scrollX), fgColor
+      tb.write " ", fgCyan, p.user.cut(8, false, tui.scrollX), fgColor
     if p.mem >= rssLimit:
       tb.write bgRed
-    tb.write " ", p.rss.formatS().cut(10, true, scrollX), bgNone
+    tb.write " ", p.rss.formatS().cut(10, true, tui.scrollX), bgNone
     if p.mem >= rssLimit:
       tb.write bgRed
-    tb.write " ", p.mem.formatP().cut(5, true, scrollX), bgNone
+    tb.write " ", p.mem.formatP().cut(5, true, tui.scrollX), bgNone
     if p.cpu >= cpuLimit:
       tb.write bgRed
-    tb.write " ", p.cpu.formatP().cut(5, true, scrollX), bgNone
+    tb.write " ", p.cpu.formatP().cut(5, true, tui.scrollX), bgNone
     var rwStr = ""
     if p.ioReadDiff + p.ioWriteDiff > 0:
       rwStr = fmt"{formatSI(p.ioReadDiff, p.ioWriteDiff)}"
-    tb.write " ", rwStr.cut(9, true, scrollX)
+    tb.write " ", rwStr.cut(9, true, tui.scrollX)
 
-    tb.write " ", p.uptime.formatT().cut(8, false, scrollX)
+    tb.write " ", p.uptime.formatT().cut(8, false, tui.scrollX)
 
     let lvl = p.parents.len
     var cmd = ""
-    if thr:
-      tb.write " ", ($p.threads).cut(3, true, scrollX), "  "
+    if tui.threads:
+      tb.write " ", ($p.threads).cut(3, true, tui.scrollX), "  "
       if lvl > 0:
         tb.write fgCyan, repeat("·", lvl)
     else:
@@ -306,7 +319,7 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       cmd.add p.cmd
     else:
       cmd.add p.name
-    tb.write fgCyan, cmd.cut(tb.width - 65 - lvl - p.docker.len - 2, false, scrollX), fgColor
+    tb.write fgCyan, cmd.cut(tb.width - 65 - lvl - p.docker.len - 2, false, tui.scrollX), fgColor
 
     inc y
     if y > tb.height-3:
@@ -314,25 +327,23 @@ proc table(tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       tb.write "..."
       break
 
-proc filter(tb: var TerminalBuffer, filter: Option[string], cnt: int, forceLive: bool) =
+proc showFilter(tui: Tui, tb: var TerminalBuffer, cnt: int) =
   tb.setCursorPos offset, tb.height - 1
-  timeButtons(tb, cnt, forceLive)
+  timeButtons(tb, cnt)
   tb.write " ", HelpCol, "@", fgNone, ",", HelpCol, "#", fgNone, " - by user,docker"
   tb.write " ", HelpCol, "Esc", fgNone, ",", HelpCol, "Ret", fgNone, " - Back "
-  tb.write " Filter: ", bgBlue, filter.get(), bgNone
+  tb.write " Filter: ", bgBlue, tui.filter.get(), bgNone
 
-proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
-            filter: Option[string], hist: int, stats, live: seq[StatV2], blog: string,
-                threads, forceLive: bool) =
+proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
   if info == nil:
-    tb.write fmt"blog not found {blog}: {hist} / {stats.len}"
+    tb.write fmt"blog not found {tui.blog}: {tui.hist} / {stats.len}"
     tb.display()
     return
 
-  info.sort(curSort, threads)
+  info.sort(tui.sort, tui.threads)
 
   if checkAnyLimit(info):
     tb.setForegroundColor(fgRed, true)
@@ -341,15 +352,135 @@ proc redraw(info: FullInfoRef, curSort: SortField, scrollX, scrollY: int,
     # tb.setForegroundColor(fgBlue, false)
     # tb.drawRect(0, 0, w-1, h-1, alarm)
 
-  let blogShort = extractFilename blog
-  header(tb, info, hist, stats.len, blogShort)
-  graph(tb, stats, live, blogShort, curSort, hist, forceLive)
-  table(tb, info.pidsInfo, curSort, scrollX, scrollY, filter, stats.len, threads)
-  if filter.isSome:
-    filter(tb, filter, stats.len, forceLive)
+  let blogShort = extractFilename tui.blog
+  tui.header(tb, info, stats.len, blogShort)
+  tui.graph(tb, stats, live, blogShort)
+  tui.table(tb, info.pidsInfo, stats.len)
+  if tui.filter.isSome:
+    tui.showFilter(tb, stats.len)
   else:
-    help(tb, curSort, w, h, scrollX, scrollY, stats.len, threads, forceLive)
+    tui.help(tb, w, h, stats.len)
   tb.display()
+
+proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
+  if tui.filter.isNone:
+    case key
+    of Key.Escape, Key.Q: tui.quit = true
+    of Key.Space: tui.draw = true
+    of Key.Left:
+      if tui.scrollX > 0: dec tui.scrollX
+      tui.draw = true
+    of Key.Right:
+      inc tui.scrollX;
+      tui.draw = true
+    of Key.Up:
+      if tui.scrollY > 0: dec tui.scrollY
+      tui.draw = true
+    of Key.PageUp:
+      if tui.scrollY > 0: tui.scrollY -= 10
+      if tui.scrollY < 0: tui.scrollY = 0
+      tui.draw = true
+    of Key.Down: inc tui.scrollY; tui.draw = true
+    of Key.PageDown: tui.scrollY += 10; tui.draw = true
+    of Key.Z: tui.scrollX = 0; tui.scrollY = 0; tui.draw = true
+    of Key.P: tui.sort = Pid; tui.draw = true
+    of Key.M: tui.sort = Mem; tui.draw = true
+    of Key.I: tui.sort = Io; tui.draw = true
+    of Key.N: tui.sort = Name; tui.draw = true
+    of Key.C: tui.sort = Cpu; tui.draw = true
+    of Key.T: tui.threads = not tui.threads; tui.draw = true
+    of Key.L: tui.forceLive = not tui.forceLive; tui.reload = true
+    of Key.Slash: tui.filter = some(""); tui.draw = true
+    of Key.LeftBracket:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(-1, tui.blog, tui.hist, stats.len)
+      else:
+        tui.forceLive = not tui.forceLive
+      tui.reload = true
+    of Key.RightBracket:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(+1, tui.blog, tui.hist, stats.len)
+      tui.reload = true
+    of Key.LeftBrace:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(-1, tui.blog, 1, stats.len)
+      tui.reload = true
+    of Key.RightBrace:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(+1, tui.blog, stats.len, stats.len)
+      tui.reload = true
+    else: discard
+  else:
+    case key
+    of Key.Escape, Key.Enter:
+      tui.filter = none(string)
+      tui.draw = true
+    of Key.A .. Key.Z:
+      tui.filter.get().add char(key)
+      tui.draw = true
+    of Key.At, Key.Hash, Key.Slash, Key.Backslash, Key.Colon, Key.Space, Key.Minus,
+        Key.Plus, Key.Underscore, Key.Comma, Key.Dot, Key.Ampersand:
+      tui.filter.get().add char(key)
+      tui.draw = true          
+    of Key.Zero .. Key.Nine:
+      tui.filter.get().add char(key)
+      tui.draw = true
+    of Key.Backspace:
+      if tui.filter.get().len > 0:
+        tui.filter.get() = tui.filter.get[0..^2]
+        tui.draw = true
+    of Key.Left:
+      if tui.scrollX > 0: dec tui.scrollX
+      tui.draw = true
+    of Key.Right:
+      inc tui.scrollX;
+      tui.draw = true
+    of Key.LeftBracket:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(-1, tui.blog, tui.hist, stats.len)
+      else:
+        tui.forceLive = not tui.forceLive
+      tui.reload = true
+    of Key.RightBracket:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(+1, tui.blog, tui.hist, stats.len)
+      tui.reload = true
+    of Key.LeftBrace:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(-1, tui.blog, 1, stats.len)
+      tui.reload = true
+    of Key.RightBrace:
+      if not tui.forceLive:
+        (tui.blog, tui.hist) = moveBlog(+1, tui.blog, stats.len, stats.len)
+      tui.reload = true
+    else: discard
+
+
+proc postProcess(tui: Tui, info: var FullInfoRef, stats, live: var seq[StatV2]) =
+  if tui.refresh == reloadRefresh:
+    tui.reload = true
+
+  if tui.reload:
+    if tui.hist == 0:
+      tui.blog = moveBlog(+1, tui.blog, stats.len, stats.len)[0]
+    if tui.refresh != reloadRefresh:
+      (info, stats) = histNoLive(tui.hist, tui.blog)
+    else:
+      (info, stats) = hist(tui.hist, tui.blog, live, tui.forceLive)
+    tui.draw = true
+
+  if tui.draw:
+    tui.redraw(info, stats, live)
+
+  if not tui.draw or tui.reload:
+    sleep sleepMs
+    if tui.refresh == reloadRefresh:
+      tui.refresh = 0
+    else:
+      inc tui.refresh
+
+  tui.draw = false
+  tui.reload = false
 
 proc tui*() =
   init()
@@ -361,165 +492,16 @@ proc tui*() =
   if getCfg().light:
     fgColor = fgLightColor
 
-  var draw = false
-  var reload = false
-  var (blog, hist) = moveBlog(0, "", 0, 0)
-  var curSort = Cpu
-  var scrollX, scrollY = 0
-  var filter = none(string)
-  var threads = false
-  var forceLive = false
+  var tui = Tui()
+  (tui.blog, tui.hist) = moveBlog(0, tui.blog, tui.hist, 0)
   var live = newSeq[StatV2]()
-  var (info, stats) = hist(hist, blog, live, forceLive)
-  redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
-      threads, forceLive)
+  var (info, stats) = hist(tui.hist, tui.blog, live, tui.forceLive)
+  tui.redraw(info, stats, live)
 
-  var refresh = 0
   while true:
-    var key = getKey()
-    if filter.isNone:
-      case key
-      of Key.Escape, Key.Q: return
-      of Key.Space: draw = true
-      of Key.Left:
-        if scrollX > 0: dec scrollX
-        draw = true
-      of Key.Right:
-        inc scrollX;
-        draw = true
-      of Key.Up:
-        if scrollY > 0: dec scrollY
-        draw = true
-      of Key.PageUp:
-        if scrollY > 0: scrollY -= 10
-        if scrollY < 0: scrollY = 0
-        draw = true
-      of Key.Down: inc scrollY; draw = true
-      of Key.PageDown:
-        scrollY += 10
-        draw = true
-      of Key.Z: scrollX = 0; scrollY = 0; draw = true
-      of Key.P: curSort = Pid; draw = true
-      of Key.M: curSort = Mem; draw = true
-      of Key.I: curSort = Io; draw = true
-      of Key.N: curSort = Name; draw = true
-      of Key.C: curSort = Cpu; draw = true
-      of Key.T: threads = not threads; draw = true
-      of Key.L: forceLive = not forceLive; reload = true
-      of Key.Slash: filter = some(""); draw = true
-      of Key.LeftBracket:
-        if not forceLive:
-          (blog, hist) = moveBlog(-1, blog, hist, stats.len)
-        else:
-          forceLive = not forceLive
-        reload = true
-      of Key.RightBracket:
-        if not forceLive:
-          (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-        reload = true
-      of Key.LeftBrace:
-        if not forceLive:
-          (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-        reload = true
-      of Key.RightBrace:
-        if not forceLive:
-          (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-        reload = true
-      else: discard
-    else:
-      case key
-      of Key.Escape, Key.Enter:
-        filter = none(string)
-        draw = true
-      of Key.A .. Key.Z:
-        filter.get().add toLowerAscii($key)
-        draw = true
-      of Key.At:  # how to convert key to char?
-        filter.get().add '@'
-        draw = true
-      of Key.Hash:
-        filter.get().add '#'
-        draw = true
-      of Key.Slash:
-        filter.get().add '/'
-        draw = true
-      of Key.Backslash:
-        filter.get().add '\\'
-        draw = true
-      of Key.Colon:
-        filter.get().add ':'
-        draw = true
-      of Key.Space:
-        filter.get().add ' '
-        draw = true
-      of Key.Minus:
-        filter.get().add '-'
-        draw = true
-      of Key.Underscore:
-        filter.get().add '_'
-        draw = true
-      of Key.Comma:
-        filter.get().add ','
-        draw = true
-      of Key.Dot:
-        filter.get().add '.'
-        draw = true
-      of Key.Zero .. Key.Nine:
-        filter.get().add char(key.int)
-        draw = true
-      of Key.Backspace:
-        if filter.get().len > 0:
-          filter.get() = filter.get[0..^2]
-          draw = true
-      of Key.Left:
-        if scrollX > 0: dec scrollX
-        draw = true
-      of Key.Right:
-        inc scrollX;
-        draw = true
-      of Key.LeftBracket:
-        if not forceLive:
-          (blog, hist) = moveBlog(-1, blog, hist, stats.len)
-        else:
-          forceLive = not forceLive
-        reload = true
-      of Key.RightBracket:
-        if not forceLive:
-          (blog, hist) = moveBlog(+1, blog, hist, stats.len)
-        reload = true
-      of Key.LeftBrace:
-        if not forceLive:
-          (blog, hist) = moveBlog(-1, blog, 1, stats.len)
-        reload = true
-      of Key.RightBrace:
-        if not forceLive:
-          (blog, hist) = moveBlog(+1, blog, stats.len, stats.len)
-        reload = true
-      else: discard
+    for key in getKeys():
+      tui.processKey(key, stats)
+      if tui.quit:
+        return
 
-    if refresh == 10:
-      reload = true
-
-    if reload:
-      if hist == 0:
-        blog = moveBlog(+1, blog, stats.len, stats.len)[0]
-      if refresh != 10:
-        (info, stats) = histNoLive(hist, blog)
-      else:
-        (info, stats) = hist(hist, blog, live, forceLive)
-      draw = true
-
-    if draw:
-      redraw(info, curSort, scrollX, scrollY, filter, hist, stats, live, blog,
-          threads, forceLive)
-
-    if not draw or reload:
-      sleep 100
-      if refresh == 10:
-        refresh = 0
-      else:
-        inc refresh
-
-    draw = false
-    reload = false
-
+    tui.postProcess(info, stats, live)

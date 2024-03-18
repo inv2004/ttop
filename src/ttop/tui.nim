@@ -262,8 +262,10 @@ proc checkFilter(filter: string, p: PidInfo): bool =
     elif fWord.startsWith("#"):
       if fWord[1..^1] notin p.docker:
         result = true
-    elif fWord notin $p.pid and fWord notin toLowerAscii(p.cmd) and fWord notin
-        toLowerAscii(p.docker):
+    elif fWord notin $p.pid and
+          fWord notin toLowerAscii(p.cmd) and
+          fWord notin toLowerAscii(p.name) and
+          fWord notin toLowerAscii(p.docker):
       result = true
 
 proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],

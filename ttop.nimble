@@ -11,7 +11,7 @@ bin = @["ttop"]
 
 requires "nim >= 1.6.10"
 
-requires "illwill"
+requires "https://github.com/inv2004/illwill"
 requires "zippy"
 requires "asciigraph"
 requires "parsetoml"

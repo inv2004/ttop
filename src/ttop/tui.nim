@@ -6,6 +6,7 @@ import strutils
 import strformat
 import tables
 import times
+import std/monotimes
 import options
 import limits
 import format
@@ -21,9 +22,6 @@ var fgColor = fgDarkColor
 const offset = 2
 const HelpCol = fgGreen
 
-const sleepMs = 25
-const reloadRefresh = 1000 div sleepMs
-
 type
   Tui = ref object
     sort = Cpu
@@ -37,7 +35,7 @@ type
     quit = false
     hist: int
     blog: string
-    refresh = 0
+    refresh: bool
 
 proc stopTui() {.noconv.} =
   illwillDeinit()
@@ -69,7 +67,8 @@ proc temp(tb: var TerminalBuffer, value: Option[float64], isLimit: bool) =
     tb.writeR formatC(value.get), -1
     tb.write bgNone
 
-proc header(tui: Tui, tb: var TerminalBuffer, info: FullInfoRef, cnt: int, blog: string) =
+proc header(tui: Tui, tb: var TerminalBuffer, info: FullInfoRef, cnt: int,
+    blog: string) =
   let mi = info.mem
   tb.setCursorPos offset, 1
   tb.write bgCyan, info.sys.hostname, fgWhite, ": ",
@@ -163,7 +162,8 @@ proc graphData(stats: seq[StatV2], sort: SortField, width: int): seq[float] =
     let diff = width - stats.len
     result.insert(float(0).repeat(diff), 0)
 
-proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2], blog: string) =
+proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
+    blog: string) =
   tb.setCursorPos offset, tb.getCursorYPos()+1
   var y = tb.getCursorYPos() + 1
   tb.setCursorPos offset, y
@@ -199,7 +199,8 @@ proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2], blog: str
 
 proc timeButtons(tb: var TerminalBuffer, cnt: int) =
   if cnt == 0:
-    tb.write " ", styleDim, "[]", fgNone, ",", HelpCol, "{} - timeshift ", styleBright, fgNone
+    tb.write " ", styleDim, "[]", fgNone, ",", HelpCol, "{} - timeshift ",
+        styleBright, fgNone
   else:
     tb.write " ", HelpCol, "[]", fgNone, ",", HelpCol, "{}", fgNone, " - timeshift "
 
@@ -239,32 +240,34 @@ proc help(tui: Tui, tb: var TerminalBuffer, w, h, cnt: int) =
   if x + 15 < w:
     tb.setCursorXPos(w - 15)
     if tui.scrollX > 0 or tui.scrollY > 0:
-      tb.write HelpCol, "z", fgNone
+      tb.write HelpCol, " ", fgNone
     else:
       tb.write " "
     tb.write fmt "WH: {w}x{h} "
 
 proc checkFilter(filter: string, p: PidInfo): bool =
-      for fWord in filter.split():
-        if fWord == "@":
-          if p.user == "root":
-            result = true
-        elif fWord.startsWith("@"):
-          if p.user == "":
-            if fWord[1..^1] notin ($p.uid):
-              result = true
-          elif fWord[1..^1] notin p.user:
-            result = true
-        elif fWord == "#":
-          if p.docker == "":
-            result = true
-        elif fWord.startsWith("#"):
-          if fWord[1..^1] notin p.docker:
-            result = true
-        elif fWord notin $p.pid and fWord notin toLowerAscii(p.cmd) and fWord notin toLowerAscii(p.docker):
+  for fWord in filter.split():
+    if fWord == "@":
+      if p.user == "root":
+        result = true
+    elif fWord.startsWith("@"):
+      if p.user == "":
+        if fWord[1..^1] notin ($p.uid):
           result = true
+      elif fWord[1..^1] notin p.user:
+        result = true
+    elif fWord == "#":
+      if p.docker == "":
+        result = true
+    elif fWord.startsWith("#"):
+      if fWord[1..^1] notin p.docker:
+        result = true
+    elif fWord notin $p.pid and fWord notin toLowerAscii(p.cmd) and fWord notin
+        toLowerAscii(p.docker):
+      result = true
 
-proc table(tui: Tui,tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo], statsLen: int) =
+proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
+    statsLen: int) =
   var y = tb.getCursorYPos() + 1
   tb.write styleBright
   tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""")
@@ -319,7 +322,8 @@ proc table(tui: Tui,tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo], 
       cmd.add p.cmd
     else:
       cmd.add p.name
-    tb.write fgCyan, cmd.cut(tb.width - 65 - lvl - p.docker.len - 2, false, tui.scrollX), fgColor
+    tb.write fgCyan, cmd.cut(tb.width - 65 - lvl - p.docker.len - 2, false,
+        tui.scrollX), fgColor
 
     inc y
     if y > tb.height-3:
@@ -363,6 +367,9 @@ proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
   tb.display()
 
 proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
+  if key == Key.None:
+    tui.refresh = true
+    return
   if tui.filter.isNone:
     case key
     of Key.Escape, Key.Q: tui.quit = true
@@ -418,10 +425,10 @@ proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
     of Key.A .. Key.Z:
       tui.filter.get().add char(key)
       tui.draw = true
-    of Key.At, Key.Hash, Key.Slash, Key.Backslash, Key.Colon, Key.Space, Key.Minus,
-        Key.Plus, Key.Underscore, Key.Comma, Key.Dot, Key.Ampersand:
+    of Key.At, Key.Hash, Key.Slash, Key.Backslash, Key.Colon, Key.Space,
+        Key.Minus, Key.Plus, Key.Underscore, Key.Comma, Key.Dot, Key.Ampersand:
       tui.filter.get().add char(key)
-      tui.draw = true          
+      tui.draw = true
     of Key.Zero .. Key.Nine:
       tui.filter.get().add char(key)
       tui.draw = true
@@ -457,30 +464,35 @@ proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
 
 
 proc postProcess(tui: Tui, info: var FullInfoRef, stats, live: var seq[StatV2]) =
-  if tui.refresh == reloadRefresh:
+  if tui.refresh:
     tui.reload = true
 
   if tui.reload:
     if tui.hist == 0:
       tui.blog = moveBlog(+1, tui.blog, stats.len, stats.len)[0]
-    if tui.refresh != reloadRefresh:
-      (info, stats) = histNoLive(tui.hist, tui.blog)
-    else:
+    if tui.refresh:
       (info, stats) = hist(tui.hist, tui.blog, live, tui.forceLive)
+      tui.refresh = false
+    else:
+      (info, stats) = histNoLive(tui.hist, tui.blog)
+    tui.reload = false
     tui.draw = true
 
   if tui.draw:
     tui.redraw(info, stats, live)
+    tui.draw = false
 
-  if not tui.draw or tui.reload:
-    sleep sleepMs
-    if tui.refresh == reloadRefresh:
-      tui.refresh = 0
+iterator keyEachSec(): Key =
+  var timeout = 1000
+  while true:
+    let a = getMonoTime().ticks
+    let k = getKeyWithTimeout(timeout)
+    if k == Key.None:
+      timeout = 1000
     else:
-      inc tui.refresh
-
-  tui.draw = false
-  tui.reload = false
+      let b = (getMonoTime().ticks - a) div 1000000
+      timeout = timeout - (b mod 1000)
+    yield k
 
 proc tui*() =
   init()
@@ -498,10 +510,8 @@ proc tui*() =
   var (info, stats) = hist(tui.hist, tui.blog, live, tui.forceLive)
   tui.redraw(info, stats, live)
 
-  while true:
-    for key in getKeys():
-      tui.processKey(key, stats)
-      if tui.quit:
-        return
-
+  for key in keyEachSec():
+    tui.processKey(key, stats)
+    if tui.quit:
+      break
     tui.postProcess(info, stats, live)

@@ -24,15 +24,15 @@ const HelpCol = fgGreen
 
 type
   Tui = ref object
-    sort = Cpu
-    scrollX = 0
-    scrollY = 0
-    filter = none(string)
-    threads = false
-    forceLive = false
-    draw = false
-    reload = false
-    quit = false
+    sort: SortField
+    scrollX: int
+    scrollY: int
+    filter: Option[string]
+    threads: bool
+    forceLive: bool
+    draw: bool
+    reload: bool
+    quit: bool
     hist: int
     blog: string
     refresh: bool
@@ -492,7 +492,7 @@ iterator keyEachSec(): Key =
     if k == Key.None:
       timeout = 1000
     else:
-      let b = (getMonoTime().ticks - a) div 1000000
+      let b = int((getMonoTime().ticks - a) div 1000000)
       timeout = timeout - (b mod 1000)
     yield k
 
@@ -506,7 +506,7 @@ proc tui*() =
   if getCfg().light:
     fgColor = fgLightColor
 
-  var tui = Tui()
+  var tui = Tui(sort: Cpu)
   (tui.blog, tui.hist) = moveBlog(0, tui.blog, tui.hist, 0)
   var live = newSeq[StatV2]()
   var (info, stats) = hist(tui.hist, tui.blog, live, tui.forceLive)

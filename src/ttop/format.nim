@@ -10,7 +10,7 @@ proc formatP*(f: float, left = false): string =
     fmt"{f:4.1f}"
 
 proc formatSPair*(b: int): (float, string) =
-  const postStr = ["b", "KB", "MB", "GB", "TB", "PB"]
+  const postStr = [" b", "KB", "MB", "GB", "TB", "PB"]
 
   var x = b * 10
   for i, v in postStr:

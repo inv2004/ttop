@@ -96,7 +96,7 @@ type FullInfo* = object
   cpu*: CpuInfo
   cpus*: seq[CpuInfo]
   mem*: MemInfo
-  pidsInfo*: OrderedTableRef[uint, procfs.PidInfo]
+  pidsInfo*: OrderedTableRef[uint, PidInfo]
   disk*: OrderedTableRef[string, Disk]
   net*: OrderedTableRef[string, Net]
   temp*: Temp
@@ -530,7 +530,7 @@ proc genParents(p: OrderedTableRef[uint, PidInfo]) =
     let parents = s.reversed()
     p[k].parents = parents
 
-proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
+proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false, group = false) =
   if threads:
     info.pidsInfo.genParents()
     let cmpFn = sortFunc(sortOrder, false)
@@ -550,7 +550,45 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false) =
   elif sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
 
+proc group*(pidsInfo: OrderedTableRef[uint, PidInfo]): OrderedTableRef[uint, PidInfo] =
+  var grpInfo = initOrderedTable[string, PidInfo]()
+  for _, pi in pidsInfo:
+    let name =
+      if pi.name.startsWith("Relay("):
+        "init"
+      else:
+        pi.name
+    var g = grpInfo.getOrDefault(name)
+    if g.state == "":
+      g.state = pi.state
+    else:
+      g.state = min(g.state, pi.state)
+    if g.user == "":
+      g.user = pi.user
+    elif g.user != pi.user:
+      g.user = "*"
+    if g.uptime == 0:
+      g.uptime = pi.uptime
+    else:
+      g.uptime = min(g.uptime, pi.uptime)
+    g.name = name
+    g.mem += pi.mem
+    g.rss += pi.rss
+    g.cpu += pi.cpu
+    g.ioReadDiff += pi.ioReadDiff
+    g.ioWriteDiff += pi.ioWriteDiff
+    g.threads.inc
+    grpInfo[name] = g
+
+  result = newOrderedTable[uint, PidInfo]()
+  var i: uint = 0
+  for _, gi in grpInfo:
+    result[i] = gi
+    inc i 
+
 when isMainModule:
-  for k, v in getDockerContainers():
-    echo k, ": ", v
-  echo fullInfo().cpu
+  let fi = fullInfo()
+  let pi = group(fi.pidsInfo)
+  fi.pidsInfo.clear()
+  for o, pi in pi:
+    echo o, ": ", pi

@@ -29,6 +29,7 @@ type
     scrollY: int
     filter: Option[string]
     threads: bool
+    group: bool
     forceLive: bool
     draw: bool
     reload: bool
@@ -215,10 +216,16 @@ proc help(tui: Tui, tb: var TerminalBuffer, w, h, cnt: int) =
       tb.write " ", HelpCol, $($x)[0], fgCyan, ($x)[1..^1]
     # tb.setCursorXPos 0+tb.getCursorXPos()
 
-  if tui.threads:
-    tb.write "  ", styleBright, fgNone, "T", fgNone, " - tree"
+  if tui.group:
+    tb.write "  ", styleBright, fgNone
   else:
-    tb.write "  ", HelpCol, "T", fgNone, " - tree"
+    tb.write "  ", HelpCol
+  tb.write "G", fgNone, " - group"
+  if tui.threads:
+    tb.write "  ", styleBright, fgNone
+  else:
+    tb.write "  ", HelpCol
+  tb.write "T", fgNone, " - tree"
   tb.write "  ", HelpCol, "/", fgNone, " - filter "
   timeButtons(tb, cnt)
   if tui.forceLive or cnt == 0:
@@ -272,9 +279,14 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     statsLen: int) =
   var y = tb.getCursorYPos() + 1
   tb.write styleBright
-  tb.write(offset, y, bgBlue, fmt"""{"S":1} {"PID":>6} {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}""")
+  tb.write(offset, y, bgBlue, fmt"""{"S":1}""")
+  if not tui.group:
+    tb.write fmt""" {"PID":>6}"""
+  tb.write fmt""" {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}"""
   if tui.threads:
     tb.write fmt""" {"THR":>3} """
+  elif tui.group:
+    tb.write fmt""" {"CNT":>3} """
   if tb.width - 63 > 0:
     tb.write ' '.repeat(tb.width-63), bgNone
   inc y
@@ -289,7 +301,8 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       continue
     tb.setCursorPos offset, y
     tb.write p.state
-    tb.write " ", p.pid.cut(6, true, tui.scrollX)
+    if not tui.group:
+      tb.write " ", p.pid.cut(6, true, tui.scrollX)
     if p.user == "":
       tb.write " ", fgMagenta, int(p.uid).cut(8, false, tui.scrollX), fgColor
     else:
@@ -312,7 +325,7 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
     let lvl = p.parents.len
     var cmd = ""
-    if tui.threads:
+    if tui.threads or tui.group:
       tb.write " ", ($p.threads).cut(3, true, tui.scrollX), "  "
       if lvl > 0:
         tb.write fgCyan, repeat("·", lvl)
@@ -361,7 +374,10 @@ proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
   let blogShort = extractFilename tui.blog
   tui.header(tb, info, stats.len, blogShort)
   tui.graph(tb, stats, live, blogShort)
-  tui.table(tb, info.pidsInfo, stats.len)
+  if tui.group:
+    tui.table(tb, group info.pidsInfo, stats.len)
+  else:
+    tui.table(tb, info.pidsInfo, stats.len)
   if tui.filter.isSome:
     tui.showFilter(tb, stats.len)
   else:
@@ -397,7 +413,14 @@ proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
     of Key.I: tui.sort = Io; tui.draw = true
     of Key.N: tui.sort = Name; tui.draw = true
     of Key.C: tui.sort = Cpu; tui.draw = true
-    of Key.T: tui.threads = not tui.threads; tui.draw = true
+    of Key.T:
+      tui.threads = not tui.threads
+      if tui.threads: tui.group = false
+      tui.draw = true
+    of Key.G:
+      tui.group = not tui.group
+      if tui.group: tui.threads = false
+      tui.draw = true
     of Key.L: tui.forceLive = not tui.forceLive; tui.reload = true
     of Key.Slash: tui.filter = some(""); tui.draw = true
     of Key.LeftBracket:

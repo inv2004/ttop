@@ -287,8 +287,8 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   else:
     tb.write fmt""" {"CNT":>6}"""
   tb.write fmt""" {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8} {"THR":>3}"""
-  if tb.width - 63 > 0:
-    tb.write ' '.repeat(tb.width-63), bgNone
+  if tb.width - 67 > 0:
+    tb.write ' '.repeat(tb.width-67), bgNone
   inc y
   var i = 0
   tb.setStyle {}
@@ -342,7 +342,7 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       cmd.add p.cmd
     else:
       cmd.add p.name
-    tb.write fgCyan, cmd.cut(tb.width - 65 - lvl - p.docker.len - 2, false,
+    tb.write fgCyan, cmd.cut(tb.width - 67 - lvl - p.docker.len - 2, false,
         tui.scrollX), fgColor
 
     inc y

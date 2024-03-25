@@ -284,11 +284,9 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   tb.write(offset, y, fmt"""{"S":1}""")
   if not tui.group:
     tb.write fmt""" {"PID":>6}"""
-  tb.write fmt""" {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}"""
-  if tui.group:
-    tb.write fmt""" {"CNT":>3}"""
-  if tui.threads or tui.group:
-    tb.write fmt""" {"THR":>3} """
+  else:
+    tb.write fmt""" {"CNT":>6}"""
+  tb.write fmt""" {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8} {"THR":>3}"""
   if tb.width - 63 > 0:
     tb.write ' '.repeat(tb.width-63), bgNone
   inc y
@@ -309,7 +307,9 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       continue
     tb.setCursorPos offset, y
     tb.write p.state
-    if not tui.group:
+    if tui.group:
+      tb.write "    ", p.count.formatN3()
+    else:
       tb.write " ", p.pid.cut(6, true, tui.scrollX)
     if p.user == "":
       tb.write " ", fgMagenta, int(p.uid).cut(8, false, tui.scrollX), fgColor
@@ -333,14 +333,9 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
     let lvl = p.parents.len
     var cmd = ""
-    if tui.group:
-      tb.write " ", p.count.formatN3()
-    if tui.threads or tui.group:
-      tb.write " ", p.threads.formatN3(), "  "
-      if lvl > 0:
+    tb.write " ", p.threads.formatN3(), "  "
+    if tui.threads and lvl > 0:
         tb.write fgCyan, repeat("·", lvl)
-    else:
-      tb.write "  "
     if p.docker != "":
       tb.write fgBlue, p.docker & ":"
     if p.cmd != "":

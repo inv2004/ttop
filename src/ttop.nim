@@ -40,6 +40,8 @@ proc main() =
         onoff(false)
       of "-v", "--version":
         echo NimblePkgVersion
+      of "--colors":
+        colors()
       else:
         echo Help
         quit 1

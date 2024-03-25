@@ -519,26 +519,28 @@ iterator keyEachSec(): Key =
       timeout = timeout - (b mod 1000)
     yield k
 
-import std/enumutils
-from terminal import setForegroundColor, setBackgroundColor, setStyle
-proc colors*() =
-  var i = 0
-  for gCurrBg in BackgroundColor:
-    for gCurrFg in ForegroundColor:
-      setForegroundColor(cast[terminal.ForegroundColor](fgNone))
-      setBackgroundColor(cast[terminal.BackgroundColor](bgNone))
-      # stdout.write fmt"{i:>3} {gCurrBg:>14}"
-      stdout.write fmt"{i:>3} "
-      setForegroundColor(cast[terminal.ForegroundColor](gCurrFg))
-      setBackgroundColor(cast[terminal.BackgroundColor](gCurrBg))
-      stdout.write fmt"{gCurrBg:>14} "
-      for s in [{}, {styleBright}, {styleDim}]:
-        setStyle(s)
-        stdout.write fmt""" {($gCurrFg)[2..^1] & ($s).replace("style", "")[1..^2]:>14}"""
-      setForegroundColor(cast[terminal.ForegroundColor](fgNone))
-      setBackgroundColor(cast[terminal.BackgroundColor](bgNone))
-      echo()
-      inc i
+when defined(debug):
+  import std/enumutils
+  from terminal import setForegroundColor, setBackgroundColor, setStyle
+
+  proc colors*() =
+    var i = 0
+    for gCurrBg in BackgroundColor:
+      for gCurrFg in ForegroundColor:
+        setForegroundColor(cast[terminal.ForegroundColor](fgNone))
+        setBackgroundColor(cast[terminal.BackgroundColor](bgNone))
+        # stdout.write fmt"{i:>3} {gCurrBg:>14}"
+        stdout.write fmt"{i:>3} "
+        setForegroundColor(cast[terminal.ForegroundColor](gCurrFg))
+        setBackgroundColor(cast[terminal.BackgroundColor](gCurrBg))
+        stdout.write fmt"{gCurrBg:>14} "
+        for s in [{}, {styleBright}, {styleDim}]:
+          setStyle(s)
+          stdout.write fmt""" {($gCurrFg)[2..^1] & ($s).replace("style", "")[1..^2]:>14}"""
+        setForegroundColor(cast[terminal.ForegroundColor](fgNone))
+        setBackgroundColor(cast[terminal.BackgroundColor](bgNone))
+        echo()
+        inc i
 
 proc tui*() =
   init()

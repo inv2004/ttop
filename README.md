@@ -21,6 +21,7 @@ System monitoring tool with historical data service, triggers and top-like TUI
    * by default you see full day on the chart, see the moment of the spike and move into it for a detailed analysis
 
 - [x] TUI with critical values highlights
+- [x] Group by program
 - [x] Search filters: `@u` - user u, `#d` - docker d
 - [x] Temperature via `sysfs`
 - [x] User-space only, doesn't require root permissions

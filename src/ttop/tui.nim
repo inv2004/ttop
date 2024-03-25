@@ -72,19 +72,21 @@ proc header(tui: Tui, tb: var TerminalBuffer, info: FullInfoRef, cnt: int,
     blog: string) =
   let mi = info.mem
   tb.setCursorPos offset, 1
-  tb.write bgCyan, info.sys.hostname, fgWhite, ": ",
+  tb.write info.sys.hostname, "    ",
       info.sys.datetime.format(
       "yyyy-MM-dd HH:mm:ss")
+  tb.write styleDim
   if tui.hist > 0:
-    tb.write fmt"    {blog}: {tui.hist} / {cnt} "
+    tb.write fmt"                  {blog} {tui.hist}/{cnt} "
   elif blog == "":
     tb.write fmt"    autoupdate    log: empty "
   else:
-    tb.write fmt"    autoupdate    {blog}: {cnt} "
+    tb.write fmt"    autoupdate    {blog} {cnt}/{cnt} "
   let curX = tb.getCursorXPos()
   if tb.width - curX - 2 > 0:
     tb.write ' '.repeat(tb.width - curX - 2)
   tb.setCursorXPos curX
+  tb.write resetStyle
   # let powerStr = fmt"{float(info.power) / 1000000:5.2f} W"
   let procStr = fmt"PROCS: {$info.pidsInfo.len}"
   tb.writeR procStr
@@ -278,25 +280,31 @@ proc checkFilter(filter: string, p: PidInfo): bool =
 proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     statsLen: int) =
   var y = tb.getCursorYPos() + 1
-  tb.write styleBright
-  tb.write(offset, y, bgBlue, fmt"""{"S":1}""")
+  tb.write styleDim
+  tb.write(offset, y, fmt"""{"S":1}""")
   if not tui.group:
     tb.write fmt""" {"PID":>6}"""
   tb.write fmt""" {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8}"""
-  if tui.threads:
+  if tui.group:
+    tb.write fmt""" {"CNT":>3}"""
+  if tui.threads or tui.group:
     tb.write fmt""" {"THR":>3} """
-  elif tui.group:
-    tb.write fmt""" {"CNT":>3} """
   if tb.width - 63 > 0:
     tb.write ' '.repeat(tb.width-63), bgNone
   inc y
-  var i: uint = 0
+  var i = 0
+  tb.setStyle {}
   tb.write fgColor
+  if tui.scrollY > 0:
+    tb.setCursorPos (tb.width div 2)-1, tb.getCursorYPos()+1
+    tb.write "..."
+    inc y
+    dec i
   for (_, p) in pi.pairs:
     if tui.filter.isSome:
       if checkFilter(tui.filter.get, p):
         continue
-    elif i < uint tui.scrollY:
+    elif i < tui.scrollY:
       inc i
       continue
     tb.setCursorPos offset, y
@@ -325,8 +333,10 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
 
     let lvl = p.parents.len
     var cmd = ""
+    if tui.group:
+      tb.write " ", p.count.formatN3()
     if tui.threads or tui.group:
-      tb.write " ", ($p.threads).cut(3, true, tui.scrollX), "  "
+      tb.write " ", p.threads.formatN3(), "  "
       if lvl > 0:
         tb.write fgCyan, repeat("·", lvl)
     else:

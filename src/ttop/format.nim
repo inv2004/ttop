@@ -20,6 +20,12 @@ proc formatSPair*(b: int): (float, string) =
 
   return (b.float, ".")
 
+proc formatN3*(a: int): string =
+  if a > 999:
+    fmt "{(a div 1000):2}k"
+  else:
+    fmt "{a:3}"
+
 proc formatS*(a: int): string =
   let (n, s) = formatSPair(a)
   if a < 1024:

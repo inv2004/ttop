@@ -58,6 +58,7 @@ type PidInfo* = object
   netInDiff*, netOutDiff*: uint
   parents*:seq[uint]  # generated from ppid, used to build tree
   threads*: int
+  count*: int
   docker*: string
 
 type CpuInfo* = object
@@ -550,15 +551,18 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false, group = false) =
   elif sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
 
+proc id(cmd: string): string =
+  let idx = cmd.find(' ')
+  if idx >= 0:
+    cmd[0..<idx]
+  else:
+    cmd
+
 proc group*(pidsInfo: OrderedTableRef[uint, PidInfo]): OrderedTableRef[uint, PidInfo] =
   var grpInfo = initOrderedTable[string, PidInfo]()
   for _, pi in pidsInfo:
-    let name =
-      if pi.name.startsWith("Relay("):
-        "init"
-      else:
-        pi.name
-    var g = grpInfo.getOrDefault(name)
+    let id = id(pi.cmd)
+    var g = grpInfo.getOrDefault(id)
     if g.state == "":
       g.state = pi.state
     else:
@@ -571,14 +575,15 @@ proc group*(pidsInfo: OrderedTableRef[uint, PidInfo]): OrderedTableRef[uint, Pid
       g.uptime = pi.uptime
     else:
       g.uptime = min(g.uptime, pi.uptime)
-    g.name = name
+    g.name = id
     g.mem += pi.mem
     g.rss += pi.rss
     g.cpu += pi.cpu
     g.ioReadDiff += pi.ioReadDiff
     g.ioWriteDiff += pi.ioWriteDiff
-    g.threads.inc
-    grpInfo[name] = g
+    g.threads += pi.threads
+    g.count.inc
+    grpInfo[id] = g
 
   result = newOrderedTable[uint, PidInfo]()
   var i: uint = 0
@@ -591,4 +596,4 @@ when isMainModule:
   let pi = group(fi.pidsInfo)
   fi.pidsInfo.clear()
   for o, pi in pi:
-    echo o, ": ", pi
+    echo o, ": ", pi.name

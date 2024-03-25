@@ -552,7 +552,7 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false, group = false) =
     sort(info.pidsInfo, sortFunc(sortOrder))
 
 proc id(cmd: string): string =
-  let idx = cmd.find(' ')
+  let idx = cmd.find({' ', ':'})
   if idx >= 0:
     cmd[0..<idx]
   else:
@@ -575,6 +575,8 @@ proc group*(pidsInfo: OrderedTableRef[uint, PidInfo]): OrderedTableRef[uint, Pid
       g.uptime = pi.uptime
     else:
       g.uptime = min(g.uptime, pi.uptime)
+    if g.docker == "":
+      g.docker = pi.docker
     g.name = id
     g.mem += pi.mem
     g.rss += pi.rss

@@ -208,15 +208,14 @@ proc timeButtons(tb: var TerminalBuffer, cnt: int) =
     tb.write " ", HelpCol, "[]", fgNone, ",", HelpCol, "{}", fgNone, " - timeshift "
 
 proc help(tui: Tui, tb: var TerminalBuffer, w, h, cnt: int) =
-  tb.setCursorPos offset, tb.height - 1
+  tb.setCursorPos offset - 1, tb.height - 1
 
-  tb.write fgNone, " order by"
+  tb.write fgNone
   for x in SortField:
     if x == tui.sort:
       tb.write " ", styleBright, fgNone, $x
     else:
       tb.write " ", HelpCol, $($x)[0], fgCyan, ($x)[1..^1]
-    # tb.setCursorXPos 0+tb.getCursorXPos()
 
   if tui.group:
     tb.write "  ", styleBright, fgNone
@@ -281,12 +280,20 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     statsLen: int) =
   var y = tb.getCursorYPos() + 1
   tb.write styleDim
-  tb.write(offset, y, fmt"""{"S":1}""")
+  tb.write(offset, y, styleDim, fmt"""{"S":1}""")
   if not tui.group:
+    if tui.sort == Pid: tb.write resetStyle else: tb.write styleDim
     tb.write fmt""" {"PID":>6}"""
   else:
     tb.write fmt""" {"CNT":>6}"""
-  tb.write fmt""" {"USER":<8} {"RSS":>10} {"MEM%":>5} {"CPU%":>5} {"r/w IO":>9} {"UP":>8} {"THR":>3}"""
+  tb.write styleDim, fmt""" {"USER":<8}"""
+  if tui.sort == Mem: tb.write resetStyle else: tb.write styleDim
+  tb.write fmt""" {"RSS":>10} {"MEM%":>5}"""
+  if tui.sort == Cpu: tb.write resetStyle else: tb.write styleDim
+  tb.write fmt""" {"CPU%":>5}"""
+  if tui.sort == IO: tb.write resetStyle else: tb.write styleDim
+  tb.write fmt""" {"r/w IO":>9}"""
+  tb.write styleDim, fmt""" {"UP":>8} {"THR":>3}"""
   if tb.width - 67 > 0:
     tb.write ' '.repeat(tb.width-67), bgNone
   inc y

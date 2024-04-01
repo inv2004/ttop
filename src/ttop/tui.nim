@@ -289,7 +289,7 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.write fmt""" {"CNT":>6}"""
   tb.write styleDim, fmt""" {"USER":<8}"""
   if tui.sort == Mem: tb.write resetStyle else: tb.write styleDim
-  tb.write fmt""" {"RSS":>10} {"MEM%":>5}"""
+  tb.write fmt""" {"RSS":>9} {"MEM%":>5}"""
   if tui.sort == Cpu: tb.write resetStyle else: tb.write styleDim
   tb.write fmt""" {"CPU%":>5}"""
   if tui.sort == IO: tb.write resetStyle else: tb.write styleDim
@@ -327,7 +327,7 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       tb.write " ", fgCyan, p.user.cut(8, false, tui.scrollX), fgColor
     if p.mem >= rssLimit:
       tb.write bgRed
-    tb.write " ", p.rss.formatS().cut(10, true, tui.scrollX), bgNone
+    tb.write " ", p.rss.formatS().cut(9, true, tui.scrollX), bgNone
     if p.mem >= rssLimit:
       tb.write bgRed
     tb.write " ", p.mem.formatP().cut(5, true, tui.scrollX), bgNone

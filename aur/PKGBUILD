@@ -1,5 +1,5 @@
 pkgname=ttop
-pkgver=1.4.4
+pkgver=1.5.0
 pkgrel=1
 pkgdesc="System monitoring tool with historical data service, triggers and top-like TUI"
 url="https://github.com/inv2004/ttop"
@@ -8,8 +8,8 @@ arch=('x86_64')
 makedepends=("git" "nim")
 source=("git+$url.git#tag=v$pkgver"
         ".INSTALL")
-sha256sums=("SKIP"
-            "43272dfa4fbabf402972446840dc6702e4be0ae3795de4c1e83115b7750bd8e3")
+sha256sums=('a1261accc724161769a27136562107b6e7d7d61eeb65526ec33e1c74b4e8c589'
+            '41dbe32f4abf6da6ca1bda9f80131d057dda936549639f71e206f639c0de057a')
 install=".INSTALL"
 backup=("etc/ttop.toml")
 

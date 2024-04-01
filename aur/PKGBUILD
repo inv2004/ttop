@@ -8,7 +8,7 @@ arch=('x86_64')
 makedepends=("git" "nim")
 source=("git+$url.git#tag=v$pkgver"
         ".INSTALL")
-sha256sums=('fe0c6a5b9ab46357af4f47a3ef3392f67d48c134b2b39a6e709b760981dcb813'
+sha256sums=('5cf7633b4f5d9edb9c4ce5fea3a754d93b707063d31244920fae67538461aab9'
             '41dbe32f4abf6da6ca1bda9f80131d057dda936549639f71e206f639c0de057a')
 install=".INSTALL"
 backup=("etc/ttop.toml")

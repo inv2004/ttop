@@ -93,12 +93,14 @@ type Temp* = object
   cpu*: Option[float64]
   nvme*: Option[float64]
 
+type PidsTable = OrderedTableRef[uint, PidInfo]
+
 type FullInfo* = object
   sys*: ref SysInfo
   cpu*: CpuInfo
   cpus*: seq[CpuInfo]
   mem*: MemInfo
-  pidsInfo*: OrderedTableRef[uint, PidInfo]
+  pidsInfo*: PidsTable
   disk*: OrderedTableRef[string, Disk]
   net*: OrderedTableRef[string, Net]
   temp*: Temp
@@ -541,11 +543,12 @@ proc genParents(p: OrderedTableRef[uint, PidInfo]) =
     let parents = s.reversed()
     p[k].parents = parents
 
-proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false, group = false) =
+proc sort*(pidsInfo: PidsTable, sortOrder = Pid, threads = false,
+    group = false) =
   if threads:
-    info.pidsInfo.genParents()
+    pidsInfo.genParents()
     let cmpFn = sortFunc(sortOrder, false)
-    info.pidsInfo.sort(proc(a, b: (uint, PidInfo)): int =
+    pidsInfo.sort(proc(a, b: (uint, PidInfo)): int =
       var i = 0
       while i < a[1].parents.len and i < b[1].parents.len:
         result = cmp(a[1].parents[i], b[1].parents[i])
@@ -555,27 +558,30 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false, group = false) =
           return result
       result = cmp(a[1].parents.len, b[1].parents.len)
       if result == 0:
-        result = cmpFn((a[0], info.pidsInfo[a[0]]), (b[0], info.pidsInfo[b[0]]))
+        result = cmpFn((a[0], pidsInfo[a[0]]), (b[0], pidsInfo[b[0]]))
     )
 
   elif sortOrder != Pid:
-    sort(info.pidsInfo, sortFunc(sortOrder))
+    sort(pidsInfo, sortFunc(sortOrder))
 
-proc id(pi: PidInfo): string =
-  return pi.name
-  let idx = pi.cmd.find({' ', ':'})
+proc getExe(cmd: string): string =
+  let idx = cmd.find({' ', ':'})
   if idx >= 0:
-    pi.cmd[0..<idx]
+    cmd[0..<idx]
   else:
-    pi.cmd
+    cmd
 
-proc group*(pidsInfo: OrderedTableRef[uint, PidInfo],
-    kernel: bool): OrderedTableRef[uint, PidInfo] =
+proc group*(pidsInfo: PidsTable, kernel: bool): PidsTable =
   var grpInfo = initOrderedTable[string, PidInfo]()
   for _, pi in pidsInfo:
     if not kernel and pi.isKernel:
       continue
-    let id = id(pi)
+    let exe = getExe pi.cmd
+    let id =
+      if pi.ppid in pidsInfo and exe == getExe(pidsInfo[pi.ppid].cmd):
+        pidsInfo[pi.ppid].name
+      else:
+        pi.name
     var g = grpInfo.getOrDefault(id)
     if g.state == "":
       g.state = pi.state
@@ -595,7 +601,7 @@ proc group*(pidsInfo: OrderedTableRef[uint, PidInfo],
     if g.cmd == "":
       g.cmd = pi.cmd
     elif g.cmd != pi.cmd:
-      g.cmd.add "..." & pi.cmd
+      g.cmd = exe
     g.mem += pi.mem
     g.rss += pi.rss
     g.cpu += pi.cpu
@@ -605,7 +611,7 @@ proc group*(pidsInfo: OrderedTableRef[uint, PidInfo],
     g.count.inc
     grpInfo[id] = g
 
-  result = newOrderedTable[uint, PidInfo]()
+  result = PidsTable()
   var i: uint = 0
   for _, gi in grpInfo:
     result[i] = gi
@@ -614,7 +620,7 @@ proc group*(pidsInfo: OrderedTableRef[uint, PidInfo],
 when isMainModule:
   let fi = fullInfo()
   for _, pi in fi.pidsInfo:
-    if "python" in pi.cmd:
+    if "firefox" in pi.cmd:
       echo pi.pid, ": ", pi.name, " --- ", pi.cmd
   # let pi = group(fi.pidsInfo)
   # fi.pidsInfo.clear()

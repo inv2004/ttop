@@ -377,22 +377,20 @@ proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
     tb.display()
     return
 
-  info.sort(tui.sort, tui.threads)
-
   if checkAnyLimit(info):
     tb.setForegroundColor(fgRed, true)
     tb.drawRect(0, 0, w-1, h-1, true)
-  # else:
-    # tb.setForegroundColor(fgBlue, false)
-    # tb.drawRect(0, 0, w-1, h-1, alarm)
 
   let blogShort = extractFilename tui.blog
   tui.header(tb, info, stats.len, blogShort)
   tui.graph(tb, stats, live, blogShort)
-  if tui.group:
-    tui.table(tb, group(info.pidsInfo, tui.kernel), stats.len)
-  else:
-    tui.table(tb, info.pidsInfo, stats.len)
+  let pidsInfo =
+    if tui.group:
+      info.pidsInfo.group(tui.kernel)
+    else:
+      info.pidsInfo
+  pidsInfo.sort(tui.sort, tui.threads)
+  tui.table(tb, pidsInfo, stats.len)
   if tui.filter.isSome:
     tui.showFilter(tb, stats.len)
   else:

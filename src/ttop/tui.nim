@@ -30,6 +30,7 @@ type
     filter: Option[string]
     threads: bool
     group: bool
+    kernel: bool
     forceLive: bool
     draw: bool
     reload: bool
@@ -306,6 +307,8 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     inc y
     dec i
   for (_, p) in pi.pairs:
+    if not tui.kernel and p.isKernel:
+      continue
     if tui.filter.isSome:
       if checkFilter(tui.filter.get, p):
         continue
@@ -342,7 +345,7 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     var cmd = ""
     tb.write " ", p.threads.formatN3(), "  "
     if tui.threads and lvl > 0:
-        tb.write fgCyan, repeat("·", lvl)
+      tb.write fgCyan, repeat("·", lvl)
     if p.docker != "":
       tb.write fgBlue, p.docker & ":"
     if p.cmd != "":
@@ -387,7 +390,7 @@ proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
   tui.header(tb, info, stats.len, blogShort)
   tui.graph(tb, stats, live, blogShort)
   if tui.group:
-    tui.table(tb, group info.pidsInfo, stats.len)
+    tui.table(tb, group(info.pidsInfo, tui.kernel), stats.len)
   else:
     tui.table(tb, info.pidsInfo, stats.len)
   if tui.filter.isSome:
@@ -432,6 +435,9 @@ proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
     of Key.G:
       tui.group = not tui.group
       if tui.group: tui.threads = false
+      tui.draw = true
+    of Key.K:
+      tui.kernel = not tui.kernel
       tui.draw = true
     of Key.L: tui.forceLive = not tui.forceLive; tui.reload = true
     of Key.Slash: tui.filter = some(""); tui.draw = true

@@ -56,8 +56,9 @@ type PidInfo* = object
   ioReadDiff*, ioWriteDiff*: uint
   netIn*, netOut*: uint
   netInDiff*, netOutDiff*: uint
-  parents*:seq[uint]  # generated from ppid, used to build tree
+  parents*: seq[uint] # generated from ppid, used to build tree
   threads*: int
+  isKernel*: bool
   count*: int
   docker*: string
 
@@ -219,11 +220,12 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     doAssert scanf(buf[0..<cmdL], "$i", pid)
     result.name = buf[1+cmdL..<cmdR]
 
-    var tmp, ppid, utime, stime, starttime, vsize, rss, threads: int
+    var tmp, ppid, utime, stime, starttime, vsize, rss, threads, flags: int
     doAssert scanf(buf[1+cmdR..^1], " $w $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i $i",
-                      result.state, ppid, tmp, tmp, tmp, tmp, tmp, tmp,          # 10
-                      tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
-                      tmp, starttime, vsize, rss)
+                      result.state, ppid, tmp, tmp, tmp, tmp, flags, tmp, # 10
+      tmp, tmp, tmp, utime, stime, tmp, tmp, tmp, tmp, threads, # 20
+      tmp, starttime, vsize, rss)
+
 
     result.name.escape()
     result.pid = pid.uint
@@ -231,6 +233,7 @@ proc parseStat(pid: uint, uptimeHz: uint, mem: MemInfo): PidInfo =
     result.vsize = vsize.uint
     result.rss = pageSize * rss.uint
     result.threads = threads
+    result.isKernel = (flags and 0x00200000) > 0
     result.uptimeHz = uptimeHz - starttime.uint
     result.uptime = result.uptimeHz div uhz
     result.cpuTime = utime.uint + stime.uint
@@ -287,7 +290,8 @@ proc parseDocker(pid: uint, hasDocker: var bool): string =
         hasDocker = true
         return dockerId
 
-proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo, hasDocker: var bool): PidInfo =
+proc parsePid(pid: uint, uptimeHz: uint, mem: MemInfo,
+    hasDocker: var bool): PidInfo =
   try:
     result = parseStat(pid, uptimeHz, mem)
     let io = parseIO(pid)
@@ -313,7 +317,8 @@ iterator pids*(): uint =
         except ValueError:
           discard
 
-proc pidsInfo*(uptimeHz: uint, memInfo: MemInfo, hasDocker: var bool): OrderedTableRef[uint, PidInfo] =
+proc pidsInfo*(uptimeHz: uint, memInfo: MemInfo,
+    hasDocker: var bool): OrderedTableRef[uint, PidInfo] =
   result = newOrderedTable[uint, PidInfo]()
   for pid in pids():
     try:
@@ -337,7 +342,8 @@ proc parseStat(): (CpuInfo, seq[CpuInfo]) =
 
     for line in lines(file):
       if line.startsWith("cpu"):
-        doAssert scanf(line, "$w $s$i $i $i $i $i $i $i $i", name, v1, v2, v3, v4, v5, v6, v7, v8)
+        doAssert scanf(line, "$w $s$i $i $i $i $i $i $i $i", name, v1, v2, v3,
+            v4, v5, v6, v7, v8)
         let total = uint(v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8)
         let idle = uint(v4 + v5)
 
@@ -381,7 +387,8 @@ proc diskInfo*(): OrderedTableRef[string, Disk] =
     for line in lines(file2):
       var tmp, read, write, total: int
       var name: string
-      doAssert scanf(line, "$s$i $s$i ${devName} $i $i $i $i $i $i $i $i $i $i", tmp, tmp, name, tmp, tmp, tmp, read, tmp, tmp, tmp, write, tmp, total)
+      doAssert scanf(line, "$s$i $s$i ${devName} $i $i $i $i $i $i $i $i $i $i",
+          tmp, tmp, name, tmp, tmp, tmp, read, tmp, tmp, tmp, write, tmp, total)
 
       if name notin result:
         continue
@@ -394,7 +401,8 @@ proc diskInfo*(): OrderedTableRef[string, Disk] =
       result[name].ioUsageRead = checkedSub(ioRead, prevInfo.disk.getOrDefault(name).ioRead)
       let ioWrite = SECTOR * write.uint
       result[name].ioWrite = ioWrite
-      result[name].ioUsageWrite = checkedSub(ioWrite, prevInfo.disk.getOrDefault(name).ioWrite)
+      result[name].ioUsageWrite = checkedSub(ioWrite,
+          prevInfo.disk.getOrDefault(name).ioWrite)
 
   return result
 
@@ -408,14 +416,16 @@ proc netInfo(): OrderedTableRef[string, Net] =
         continue
       var name: string
       var tmp, netIn, netOut: int
-      if not scanf(line, "$s${devName}:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i", name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut):
+      if not scanf(line, "$s${devName}:$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i$s$i",
+          name, netIn, tmp, tmp, tmp, tmp, tmp, tmp, tmp, netOut):
         continue
       if name.startsWith("veth"):
         continue
 
       result[name] = Net(
         netIn: netIn.uint,
-        netInDiff: checkedSub(netIn.uint, prevInfo.net.getOrDefault(name).netIn),
+        netInDiff: checkedSub(netIn.uint, prevInfo.net.getOrDefault(
+            name).netIn),
         netOut: netOut.uint,
         netOutDiff: checkedSub(netOut.uint, prevInfo.net.getOrDefault(name).netOut)
       )
@@ -551,17 +561,21 @@ proc sort*(info: FullInfoRef, sortOrder = Pid, threads = false, group = false) =
   elif sortOrder != Pid:
     sort(info.pidsInfo, sortFunc(sortOrder))
 
-proc id(cmd: string): string =
-  let idx = cmd.find({' ', ':'})
+proc id(pi: PidInfo): string =
+  return pi.name
+  let idx = pi.cmd.find({' ', ':'})
   if idx >= 0:
-    cmd[0..<idx]
+    pi.cmd[0..<idx]
   else:
-    cmd
+    pi.cmd
 
-proc group*(pidsInfo: OrderedTableRef[uint, PidInfo]): OrderedTableRef[uint, PidInfo] =
+proc group*(pidsInfo: OrderedTableRef[uint, PidInfo],
+    kernel: bool): OrderedTableRef[uint, PidInfo] =
   var grpInfo = initOrderedTable[string, PidInfo]()
   for _, pi in pidsInfo:
-    let id = id(pi.cmd)
+    if not kernel and pi.isKernel:
+      continue
+    let id = id(pi)
     var g = grpInfo.getOrDefault(id)
     if g.state == "":
       g.state = pi.state
@@ -578,6 +592,10 @@ proc group*(pidsInfo: OrderedTableRef[uint, PidInfo]): OrderedTableRef[uint, Pid
     if g.docker == "":
       g.docker = pi.docker
     g.name = id
+    if g.cmd == "":
+      g.cmd = pi.cmd
+    elif g.cmd != pi.cmd:
+      g.cmd.add "..." & pi.cmd
     g.mem += pi.mem
     g.rss += pi.rss
     g.cpu += pi.cpu
@@ -591,11 +609,14 @@ proc group*(pidsInfo: OrderedTableRef[uint, PidInfo]): OrderedTableRef[uint, Pid
   var i: uint = 0
   for _, gi in grpInfo:
     result[i] = gi
-    inc i 
+    inc i
 
 when isMainModule:
   let fi = fullInfo()
-  let pi = group(fi.pidsInfo)
-  fi.pidsInfo.clear()
-  for o, pi in pi:
-    echo o, ": ", pi.name
+  for _, pi in fi.pidsInfo:
+    if "python" in pi.cmd:
+      echo pi.pid, ": ", pi.name, " --- ", pi.cmd
+  # let pi = group(fi.pidsInfo)
+  # fi.pidsInfo.clear()
+  # for o, pi in pi:
+    # echo o, ": ", pi.name

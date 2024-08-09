@@ -16,7 +16,7 @@ jobs:
     steps:
       - run: sudo apt-get -y install musl-tools
       - uses: actions/checkout@v3
-      - uses: jiro4989/setup-nim-action@v1
+      - uses: jiro4989/setup-nim-action@v2
       - run: nim --version && nimble -y -d install && nimble static && nimble staticdebug
       - uses: ncipollo/release-action@v1
         if: contains(github.ref, 'refs/tags/v')

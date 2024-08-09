@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: sudo apt-get -y install musl-tools
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: jiro4989/setup-nim-action@v2
       - run: nim --version && nimble -y -d install && nimble static && nimble staticdebug
       - uses: ncipollo/release-action@v1
@@ -31,7 +31,7 @@ jobs:
     needs: build
     # if: contains(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ulises-jeremias/github-actions-aur-publish@v1
         with:
           pkgname: ttop

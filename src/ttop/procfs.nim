@@ -179,7 +179,7 @@ proc parseUptime(): uint =
     let line = readLines(file, 1)[0]
     var f: float
     doAssert scanf(line, "$f", f)
-    uint(float(hz) * f)
+    return uint(float(hz) * f)
 
 proc parseSize(str: string): uint =
   let normStr = str.strip(true, false)
@@ -618,10 +618,17 @@ proc group*(pidsInfo: PidsTable, kernel: bool): PidsTable =
     inc i
 
 when isMainModule:
-  let fi = fullInfo()
-  for _, pi in fi.pidsInfo:
-    if "firefox" in pi.cmd:
-      echo pi.pid, ": ", pi.name, " --- ", pi.cmd
+  template t(body: untyped) =
+    try:
+      body
+    except CatchableError, Defect:
+      raise getCurrentException()
+
+  proc f(): int =
+    t:
+      100
+
+  echo f()
   # let pi = group(fi.pidsInfo)
   # fi.pidsInfo.clear()
   # for o, pi in pi:

@@ -127,7 +127,7 @@ proc fullInfo*(prev: FullInfoRef = nil): FullInfoRef
 
 var prevInfo = newFullInfo()
 
-template catchErr(file: untyped, filename: string, body: untyped) =
+template catchErr(file: untyped, filename: string, body: untyped): untyped =
   let file: string = filename
   try:
     body
@@ -179,7 +179,7 @@ proc parseUptime(): uint =
     let line = readLines(file, 1)[0]
     var f: float
     doAssert scanf(line, "$f", f)
-    return uint(float(hz) * f)
+    uint(float(hz) * f)
 
 proc parseSize(str: string): uint =
   let normStr = str.strip(true, false)
@@ -618,7 +618,7 @@ proc group*(pidsInfo: PidsTable, kernel: bool): PidsTable =
     inc i
 
 when isMainModule:
-  template t(body: untyped) =
+  template t(body: untyped): untyped =
     try:
       body
     except CatchableError, Defect:

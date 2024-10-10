@@ -162,6 +162,7 @@ proc save*(): FullInfoRef =
   let buf = compress(result[].toJson())
   let blog = saveBlog()
   let file = open(blog, fmAppend)
+  defer: file.close()
   if flock(file.getFileHandle, 2 or 4) != 0:
     writeLine(stderr, "cannot open locked: " & blog)
     quit 1
@@ -169,7 +170,6 @@ proc save*(): FullInfoRef =
   let s = newFileStream(file)
   if s == nil:
     raise newException(IOError, "cannot open " & blog)
-  defer: s.close()
 
   s.saveStat result
   s.write buf.len.uint32

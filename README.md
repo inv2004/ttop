@@ -36,7 +36,7 @@ System monitoring tool with historical data service, triggers and top-like TUI
 yay -S ttop             # enables systemd.timers automatically
 ```
 
-### Static binary
+### Static binary (x86-64)
 
 ```bash
 curl -LO https://github.com/inv2004/ttop/releases/latest/download/ttop \

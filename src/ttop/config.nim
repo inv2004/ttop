@@ -17,6 +17,7 @@ type
     docker*: string
     light*: bool
     triggers*: seq[Trigger]
+    refreshTimeout*: int
 
 var cfg: CfgRef
 
@@ -41,7 +42,8 @@ proc initCfg*() =
   cfg = CfgRef(
     light: toml{"light"}.getBool(),
     path: toml{"data", "path"}.getStr(getDataDir()),
-    docker: toml{"docker"}.getStr(DOCKER_SOCK)
+    docker: toml{"docker"}.getStr(DOCKER_SOCK),
+    refreshTimeout: toml{"refresh_timeout"}.getInt(1000)
   )
 
   for t in toml{"trigger"}.getElems():

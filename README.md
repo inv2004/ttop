@@ -87,6 +87,8 @@ cmd = "$HOME/.local/bin/tel.sh"
 ```toml
 # light = false            # set true for light term (default = false)
 
+# refresh_timeout = 1000   # TUI refresh timeout
+
 # docker = "/var/run/docker.sock"   # docker's socket path
 
 # [data]

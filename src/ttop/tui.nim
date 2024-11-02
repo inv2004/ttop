@@ -523,16 +523,16 @@ proc postProcess(tui: Tui, info: var FullInfoRef, stats, live: var seq[StatV2]) 
     tui.redraw(info, stats, live)
     tui.draw = false
 
-iterator keyEachSec(): Key =
-  var timeout = 1000
+iterator keyEachTimeout(refreshTimeout: int = 1000): Key =
+  var timeout = refreshTimeout
   while true:
     let a = getMonoTime().ticks
     let k = getKeyWithTimeout(timeout)
     if k == Key.None:
-      timeout = 1000
+      timeout = refreshTimeout
     else:
       let b = int((getMonoTime().ticks - a) div 1000000)
-      timeout = timeout - (b mod 1000)
+      timeout = timeout - (b mod refreshTimeout)
     yield k
 
 when defined(debug):
@@ -574,7 +574,7 @@ proc tui*() =
   var (info, stats) = hist(tui.hist, tui.blog, live, tui.forceLive)
   tui.redraw(info, stats, live)
 
-  for key in keyEachSec():
+  for key in keyEachTimeout(getCfg().refreshTimeout):
     tui.processKey(key, stats)
     if tui.quit:
       break

@@ -57,7 +57,8 @@ rm ~/.local/bin/ttop
 ### Build from source
 ```bash
 curl https://nim-lang.org/choosenim/init.sh -sSf | sh    # Nim setup from nim-lang.org
-
+```
+```bash
 git clone https://github.com/inv2004/ttop
 cd ttop
 nimble -d:release build

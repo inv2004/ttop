@@ -80,9 +80,7 @@ From v0.8.1 you can trigger external tool, for example curl, to send notificatio
 cmd = "$HOME/.local/bin/tel.sh"
 ```
 
-#### Config with all parameters described
-
-* if you need it
+#### Config with all parameters described (if you need it)
 
 ```toml
 # light = false            # set true for light term (default = false)

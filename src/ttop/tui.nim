@@ -165,6 +165,8 @@ proc graphData(stats: seq[StatV2], sort: SortField, width: int): seq[float] =
   if result.len < width:
     let diff = width - stats.len
     result.insert(float(0).repeat(diff), 0)
+  elif result.len > width:
+    result = result[^width..^1]
 
 proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
     blog: string) =

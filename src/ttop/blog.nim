@@ -10,6 +10,7 @@ import os
 import sequtils
 import algorithm
 import jsony
+import strformat
 
 type StatV1* = object
   prc*: int
@@ -175,6 +176,91 @@ proc save*(): FullInfoRef =
   s.write buf.len.uint32
   s.write buf
   s.write buf.len.uint32
+
+proc printProcesses*(path: string) =
+  let s = newFileStream(path)
+  if s == nil:
+    echo "Cannot open file: ", path
+    quit 1
+  defer: s.close()
+
+  var buf: string
+  echo "timestamp\tpid\tcpu\tmem_rss_kb\tmem_vsize_kb\tmem_pct\tuser\tname\tcmd"
+  while not s.atEnd():
+    discard s.stat()
+    let sz = s.readUInt32().int
+    buf = s.readStr(sz)
+    discard s.readUInt32()
+    let info = infoFromGzip(buf)
+    let tsStr = info.sys.datetime.format(TIME_FORMAT)
+    for pid, pinfo in info.pidsInfo:
+      echo &"{tsStr}\t{pid}\t{pinfo.cpu:.2f}\t{pinfo.rss div 1024}\t{pinfo.vsize div 1024}\t{pinfo.mem:.2f}\t{pinfo.user}\t{pinfo.name}\t{pinfo.cmd}"
+
+type
+  PartialFullInfo = object
+    sys: SysInfo
+
+proc printSummary*(path: string) =
+  let s = newFileStream(path)
+  if s == nil:
+    echo "Cannot open file: ", path
+    quit 1
+  defer: s.close()
+
+  var entries: seq[tuple[ts: DateTime, prc: int, cpu: float, memTotal: uint, memAvailable: uint, io: uint]] = @[]
+
+  while not s.atEnd():
+    let headerSize = s.readUInt32().int
+    var stat: StatV2
+    var headerRead = false
+
+    if headerSize == sizeof(StatV2):
+      if s.readData(stat.addr, sizeof(StatV2)) == sizeof(StatV2):
+        headerRead = true
+    elif headerSize == sizeof(StatV1):
+      var sv1: StatV1
+      if s.readData(sv1.addr, sizeof(StatV1)) == sizeof(StatV1):
+        stat = toStatV2(sv1)
+        headerRead = true
+
+    if not headerRead:
+      # Skip unknown header format
+      s.setPosition(s.getPosition + headerSize)
+      let dataSize = s.readUInt32().int
+      s.setPosition(s.getPosition + dataSize)
+      discard s.readUInt32()
+      continue
+
+    # Read compressed data
+    let dataSize = s.readUInt32().int
+    let buf = s.readStr(dataSize)
+    discard s.readUInt32()  # Skip trailing size
+
+    # Extract timestamp from compressed data
+    try:
+      let jsonStr = uncompress(buf)
+      let info = jsonStr.fromJson(PartialFullInfo)
+      entries.add((
+        ts: info.sys.datetime,
+        prc: stat.prc,
+        cpu: stat.cpu,
+        memTotal: stat.memTotal,
+        memAvailable: stat.memAvailable,
+        io: stat.io
+      ))
+    except:
+      stderr.writeLine "Skipping corrupt record: ", getCurrentExceptionMsg()
+
+  if entries.len == 0:
+    echo "No valid data found in blog: ", path
+    return
+
+  # Print summary table
+  echo "Timestamp               |  Procs | CPU %  | Mem Total | Mem Avail | I/O"
+  echo "------------------------+--------+--------+-----------+-----------+--------"
+  for e in entries:
+    echo &"{e.ts.format(TIME_FORMAT):<24} | {e.prc:>6} | {e.cpu:>6.2f} | {e.memTotal div 1024:>9}M | {e.memAvailable div 1024:>9}M | {e.io}"
+
 
 when isMainModule:
   var (blog, h) = moveBlog(0, "", 0, 0)

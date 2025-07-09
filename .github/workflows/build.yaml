@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     needs: build
-    # if: contains(github.ref, 'refs/tags/v')
+    if: contains(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
       - uses: ulises-jeremias/github-actions-aur-publish@v1

@@ -164,11 +164,12 @@ proc graphData(stats, live: seq[StatV2], sort: SortField, width: int, isLive: bo
     of Io: result = data.mapIt(float(it.io))
     else: result = data.mapIt(float(it.prc))
 
-  if result.len < width:
-    let diff = width - stats.len
-    result.insert(float(0).repeat(diff), 0)
-  elif isLive and result.len > width:
-    result = result[^width..^1]
+  if isLive:
+    if result.len > width:
+      result = result[^width..^1]
+    elif result.len < width:
+      let diff = width - data.len
+      result.insert(float(0).repeat(diff), 0)
 
 proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
     blog: string) =

@@ -155,18 +155,21 @@ proc header(tui: Tui, tb: var TerminalBuffer, info: FullInfoRef, cnt: int,
       tb.write fgCyan, k, fgColor, " ", formatS(net.netInDiff,
           net.netOutDiff)
 
-proc graphData(stats: seq[StatV2], sort: SortField, width: int): seq[float] =
-  case sort:
-    of Cpu: result = stats.mapIt(it.cpu)
-    of Mem: result = stats.mapIt(int(it.memTotal - it.memAvailable).formatSPair()[0])
-    of Io: result = stats.mapIt(float(it.io))
-    else: result = stats.mapIt(float(it.prc))
+proc graphData(stats, live: seq[StatV2], sort: SortField, width: int, isLive: bool): seq[float] =
+  let data = if isLive: live else: stats
 
-  if result.len < width:
-    let diff = width - stats.len
-    result.insert(float(0).repeat(diff), 0)
-  elif result.len > width:
-    result = result[^width..^1]
+  case sort:
+    of Cpu: result = data.mapIt(it.cpu)
+    of Mem: result = data.mapIt(int(it.memTotal - it.memAvailable).formatSPair()[0])
+    of Io: result = data.mapIt(float(it.io))
+    else: result = data.mapIt(float(it.prc))
+
+  if isLive:
+    if result.len > width:
+      result = result[^width..^1]
+    elif result.len < width:
+      let diff = width - data.len
+      result.insert(float(0).repeat(diff), 0)
 
 proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
     blog: string) =
@@ -175,9 +178,7 @@ proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
   tb.setCursorPos offset, y
   let w = terminalWidth()
   let graphWidth = w - 12
-  let data =
-    if tui.forceLive or stats.len == 0: graphData(live, tui.sort, graphWidth)
-    else: graphData(stats, tui.sort, 0)
+  let data = graphData(stats, live, tui.sort, graphWidth, tui.forceLive or stats.len == 0)
   try:
     let gLines = plot(data, width = graphWidth, height = 4).split("\n")
     y += 5 - gLines.len

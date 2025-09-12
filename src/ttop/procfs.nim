@@ -618,18 +618,14 @@ proc group*(pidsInfo: PidsTable, kernel: bool): PidsTable =
     inc i
 
 when isMainModule:
-  template t(body: untyped): untyped =
-    try:
-      body
-    except CatchableError, Defect:
-      raise getCurrentException()
-
-  proc f(): int =
-    t:
-      100
-
-  echo f()
-  # let pi = group(fi.pidsInfo)
-  # fi.pidsInfo.clear()
-  # for o, pi in pi:
-    # echo o, ": ", pi.name
+  import format
+  let t = parseSize("2009312 kB")
+  let f = parseSize("1147380 kB")
+  let a = parseSize("1607008 kB")
+  let b = parseSize("21344 kB")
+  let c = parseSize("625488 kB")
+  echo formatD(a, t)
+  echo formatD(f, t)
+  echo formatD(f + b , t)
+  echo formatD(f + c , t)
+  echo formatD(f + b + c , t)

@@ -44,10 +44,8 @@ proc formatS*(a, b: int, delim = " / "): string =
   else:
     if a < 1024 and b < 1024:
       fmt "{n1.int} {s1}{delim}{n2.int} {s2}"
-    elif a < 1024:
-      fmt "{n1.int} {s1}{delim}{n2:.1f} {s2}"
     else:
-      fmt "{n1:.1f} {s1}{delim}{n2.int} {s2}"
+      fmt "{n1:.1f} {s1}{delim}{n2:.1f} {s2}"
 
 proc formatSI*(a, b: int, delim = "/"): string =
   let (n1, s1) = formatSPair(a)

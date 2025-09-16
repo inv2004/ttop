@@ -177,7 +177,21 @@ proc save*(): FullInfoRef =
   s.write buf.len.uint32
 
 when isMainModule:
-  var (blog, h) = moveBlog(0, "", 0, 0)
-  var live = newSeq[StatV2]()
-  var (info, stats) = hist(h, blog, live)
-  echo info.toJson
+  proc print(fName: string) =
+    let s = newFileStream(fName)
+    if s == nil:
+      return
+    defer: s.close()
+
+    var buf = ""
+
+    while not s.atEnd():
+      let stat = s.stat()
+      let sz = s.readUInt32().int
+      let buf = s.readStr(sz)
+      discard s.readUInt32()
+      let info = infoFromGzip(buf)
+      echo stat.toJson
+      echo info.toJson
+
+  print("/home/u/.cache/ttop/2025-09-13.blog")

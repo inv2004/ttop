@@ -13,6 +13,7 @@ import format
 import sequtils
 import blog
 import asciigraph
+import std/math
 from terminal import setCursorXPos
 
 const fgDarkColor = fgWhite
@@ -37,8 +38,16 @@ type
     quit: bool
     hist: int
     blog: string
+    graphHeight: int
+    autoScale: bool
     broken: bool
     refresh: bool
+    netIf: string
+    # Rolling per-interface network history for live mode.
+    # Each tick appends the current netInDiff/netOutDiff for every interface,
+    # providing a time-series that graphNet plots when sort == Net.
+    # Capped at 1000 entries (matching the live seq[StatV2] buffer).
+    liveNetHistory: NetHistory
 
 proc stopTui() {.noconv.} =
   illwillDeinit()
@@ -69,6 +78,12 @@ proc temp(tb: var TerminalBuffer, value: Option[float64], isLimit: bool) =
       tb.write fgBlue, styleBright
     tb.writeR formatC(value.get), -1
     tb.write bgNone
+
+proc activeNetKeys(info: FullInfoRef): seq[string] =
+  for k, v in info.net:
+    if v.netIn == 0 and v.netOut == 0:
+      continue
+    result.add k
 
 proc header(tui: Tui, tb: var TerminalBuffer, info: FullInfoRef, cnt: int,
     blog: string) =
@@ -152,37 +167,141 @@ proc header(tui: Tui, tb: var TerminalBuffer, info: FullInfoRef, cnt: int,
     for i, k in netRow:
       if i > 0:
         tb.write " | "
+      if tui.sort == Net and k == tui.netIf:
+        tb.write bgBlue, fgCyan, k, bgNone, fgColor, " "
+      else:
+        tb.write fgCyan, k, fgColor, " "
       let net = info.net[k]
-      tb.write fgCyan, k, fgColor, " ", formatS(net.netInDiff,
-          net.netOutDiff)
+      tb.write formatS(net.netInDiff, net.netOutDiff)
 
-proc graphData(stats, live: seq[StatV2], sort: SortField, width: int, isLive: bool): seq[float] =
+proc graphData(stats, live: seq[StatV2], sort: SortField, width: int, isLive: bool,
+    refreshMs: int, netIf: string = ""): (seq[float], string) =
+
   let data = if isLive: live else: stats
+  let refreshSec = refreshMs.float / 1000.0
 
   case sort:
-    of Cpu: result = data.mapIt(it.cpu)
-    of Mem: result = data.mapIt(int(it.memTotal - it.memAvailable).formatSPair()[0])
-    of Io: result = data.mapIt(float(it.io))
-    else: result = data.mapIt(float(it.prc))
+    of Cpu: result[0] = data.mapIt(it.cpu)
+    of Mem: result[0] = data.mapIt(int(it.memTotal - it.memAvailable).formatSPair()[0])
+    of Io:
+      result[0] = data.mapIt(float(it.io) / 1024.0 / refreshSec)
+      result[1] = "KB/s"
+    of Net:
+      result[0] = data.mapIt(float(it.netIn + it.netOut) / 1024.0 / refreshSec)
+      result[1] = netIf & " ↕KB/s"
+    else: result[0] = data.mapIt(float(it.prc))
 
   if isLive:
-    if result.len > width:
-      result = result[^width..^1]
-    elif result.len < width:
+    if result[0].len > width:
+      result[0] = result[0][^width..^1]
+    elif result[0].len < width:
       let diff = width - data.len
-      result.insert(float(0).repeat(diff), 0)
+      result[0].insert(float(0).repeat(diff), 0)
+
+proc graphNet(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
+    blog: string, y: var int, info: FullInfoRef) =
+  let w = terminalWidth()
+  let graphWidth = w - 12
+  let isLive = tui.forceLive or stats.len == 0
+  let refreshSec = getCfg().refreshTimeout.float / 1000.0
+  let netIf = tui.netIf
+
+  var rxData: seq[float]
+  var txData: seq[float]
+
+  # Historical mode: use cached per-interface time-series from blogCache.
+  # This was built once when the blog file was first read; subsequent
+  # navigations within the same file hit the cache with zero file I/O.
+  if not isLive and blogCache.netHistory != nil and netIf.len > 0 and
+      netIf in blogCache.netHistory:
+    let inData = blogCache.netHistory[netIf].inData
+    let outData = blogCache.netHistory[netIf].outData
+    rxData = inData.mapIt(float(it) / 1024.0 / refreshSec)
+    txData = outData.mapIt(float(it) / 1024.0 / refreshSec)
+  # Live mode: use the rolling per-interface history accumulated each tick.
+  # liveNetHistory is built in postProcess by appending info.net[if].netInDiff
+  # and netOutDiff on every refresh, giving a proper per-interface time-series
+  # instead of repeating a single aggregated value across all live samples.
+  elif isLive and tui.liveNetHistory != nil and netIf.len > 0 and
+      netIf in tui.liveNetHistory:
+    let inData = tui.liveNetHistory[netIf].inData
+    let outData = tui.liveNetHistory[netIf].outData
+    rxData = inData.mapIt(float(it) / 1024.0 / refreshSec)
+    txData = outData.mapIt(float(it) / 1024.0 / refreshSec)
+  else:
+    rxData = newSeq[float]()
+    txData = newSeq[float]()
+
+  if isLive:
+    if rxData.len > graphWidth:
+      rxData = rxData[^graphWidth..^1]
+      txData = txData[^graphWidth..^1]
+    elif rxData.len < graphWidth:
+      let diff = graphWidth - rxData.len
+      rxData.insert(float(0).repeat(diff), 0)
+      txData.insert(float(0).repeat(diff), 0)
+
+  for idx, ser in [(rxData, netIf & " ↓KB/s"), (txData, netIf & " ↑KB/s")]:
+    var dd = ser[0]
+    if dd.len > 0 and min(dd) == max(dd):
+      for i in 0..<dd.len:
+        dd[i] += 0.01
+    try:
+      let plotYMin = if tui.autoScale: NaN else: 0.0
+      let gLines = plot(dd, width = graphWidth, height = tui.graphHeight,
+          yMin = plotYMin).split("\n")
+      let graphRows = tui.graphHeight + 1
+      let startY = y + graphRows - gLines.len
+      y += graphRows + 1
+      for i, g in gLines:
+        tb.setCursorPos offset-1, startY+i
+        tb.write g
+      tb.setCursorPos offset, y-1
+      tb.write styleDim, ser[1], fgNone
+    except CatchableError, Defect:
+      tb.setCursorPos offset, y
+      tb.write "error in net graph"
+      inc y
+
+  if tui.hist > 0 and not tui.forceLive:
+    let cc = if rxData.len > 2: rxData.len - 1 else: 1
+    let x = ((tui.hist-1) * (w-11-2)) div (cc)
+    tb.setCursorPos offset + 8 + x, y
+    tb.write styleBright, "^"
+  else:
+    tb.setCursorPos offset, y
+    if isLive:
+      if stats.len == 0 and not tui.forceLive and tui.hist > 0:
+        tb.writeR("No historical stats found ", 5)
+      tb.write bgGreen
+      tb.writeR "LIVE"
+      tb.write bgNone
+    else:
+      if tui.broken:
+        tb.writeR "corrupted " & blog
+      else:
+        tb.writeR blog
 
 proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
-    blog: string) =
+    blog: string, info: FullInfoRef) =
   tb.setCursorPos offset, tb.getCursorYPos()+1
   var y = tb.getCursorYPos() + 1
   tb.setCursorPos offset, y
   let w = terminalWidth()
   let graphWidth = w - 12
-  let data = graphData(stats, live, tui.sort, graphWidth, tui.forceLive or stats.len == 0)
+  if tui.sort == Net:
+    tui.graphNet(tb, stats, live, blog, y, info)
+    return
+
+  var (data, label) = graphData(stats, live, tui.sort, graphWidth,
+      tui.forceLive or stats.len == 0, getCfg().refreshTimeout)
+  if data.len > 0 and min(data) == max(data):
+    for i in 0..<data.len:
+      data[i] += 0.01
   try:
-    let gLines = plot(data, width = graphWidth, height = 4).split("\n")
-    y += 5 - gLines.len
+    let plotYMin = if tui.autoScale: NaN else: 0.0
+    let gLines = plot(data, width = graphWidth, height = tui.graphHeight, yMin = plotYMin).split("\n")
+    y += (tui.graphHeight + 1) - gLines.len
     for i, g in gLines:
       tb.setCursorPos offset-1, y+i
       tb.write g
@@ -194,7 +313,7 @@ proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
     else:
       tb.setCursorPos offset, tb.getCursorYPos() + 1
       if stats.len == 0 or tui.forceLive:
-        if stats.len == 0:
+        if stats.len == 0 and not tui.forceLive and tui.hist > 0:
           tb.writeR("No historical stats found ", 5)
         tb.write bgGreen
         tb.writeR "LIVE"
@@ -204,6 +323,8 @@ proc graph(tui: Tui, tb: var TerminalBuffer, stats, live: seq[StatV2],
           tb.writeR "corrupted " & blog
         else:
           tb.writeR blog
+    if label.len > 0:
+      tb.write " ", styleDim, label, fgNone
   except CatchableError, Defect:
     tb.write("error in graph: " & $deduplicate(data))
     tb.setCursorPos offset, tb.getCursorYPos() + 1
@@ -221,9 +342,15 @@ proc help(tui: Tui, tb: var TerminalBuffer, w, h, cnt: int) =
   tb.write fgNone
   for x in SortField:
     if x == tui.sort:
-      tb.write " ", styleBright, fgNone, $x
+      if x == Net:
+        tb.write " ", styleBright, fgNone, "Net"
+      else:
+        tb.write " ", styleBright, fgNone, $x
     else:
-      tb.write " ", HelpCol, $($x)[0], fgCyan, ($x)[1..^1]
+      if x == Net:
+        tb.write " ", fgCyan, "N", HelpCol, "e", fgCyan, "t"
+      else:
+        tb.write " ", HelpCol, $($x)[0], fgCyan, ($x)[1..^1], fgNone
 
   if tui.group:
     tb.write "  ", styleBright, fgNone
@@ -242,6 +369,8 @@ proc help(tui: Tui, tb: var TerminalBuffer, w, h, cnt: int) =
   else:
     tb.write " ", HelpCol, "L", fgNone, " - live "
   tb.write " ", HelpCol, "Esc,Q", fgNone, " - quit "
+  tb.write " ", HelpCol, "+/-", fgNone, " - graph size"
+  tb.write " ", HelpCol, "A", fgNone, " - scale"
 
   let x = tb.getCursorXPos()
 
@@ -291,9 +420,9 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   tb.write(offset, y, styleDim, fmt"""{"S":1}""")
   if not tui.group:
     if tui.sort == Pid: tb.write resetStyle else: tb.write styleDim
-    tb.write fmt""" {"PID":>6}"""
+    tb.write fmt""" {"PID":>8}"""
   else:
-    tb.write fmt""" {"CNT":>6}"""
+    tb.write fmt""" {"CNT":>8}"""
   tb.write styleDim, fmt""" {"USER":<8}"""
   if tui.sort == Mem: tb.write resetStyle else: tb.write styleDim
   tb.write fmt""" {"RSS":>9} {"MEM%":>5}"""
@@ -301,9 +430,11 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
   tb.write fmt""" {"CPU%":>5}"""
   if tui.sort == IO: tb.write resetStyle else: tb.write styleDim
   tb.write fmt""" {"r/w IO":>9}"""
+  if tui.sort == Net: tb.write resetStyle else: tb.write styleDim
+  tb.write fmt""" {"NET":>5}"""
   tb.write styleDim, fmt""" {"UP":>8} {"THR":>3}"""
-  if tb.width - 67 > 0:
-    tb.write ' '.repeat(tb.width-67), bgNone
+  if tb.width - 76 > 0:
+    tb.write ' '.repeat(tb.width-76), bgNone
   inc y
   var i = 0
   tb.setStyle {}
@@ -325,9 +456,9 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     tb.setCursorPos offset, y
     tb.write p.state
     if tui.group:
-      tb.write "    ", p.count.formatN3()
+      tb.write "      ", p.count.formatN3()
     else:
-      tb.write " ", p.pid.cut(6, true, tui.scrollX)
+      tb.write " ", p.pid.cut(8, true, tui.scrollX)
     if p.user == "":
       tb.write " ", fgMagenta, int(p.uid).cut(8, false, tui.scrollX), fgColor
     else:
@@ -345,6 +476,10 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
     if p.ioReadDiff + p.ioWriteDiff > 0:
       rwStr = fmt"{formatSI(p.ioReadDiff, p.ioWriteDiff)}"
     tb.write " ", rwStr.cut(9, true, tui.scrollX)
+    var netStr = ""
+    if p.netSocksTcp + p.netSocksUdp > 0:
+      netStr = fmt"{p.netSocksTcp}/{p.netSocksUdp}"
+    tb.write " ", netStr.cut(5, true, tui.scrollX)
 
     tb.write " ", p.uptime.formatT().cut(8, false, tui.scrollX)
 
@@ -359,7 +494,7 @@ proc table(tui: Tui, tb: var TerminalBuffer, pi: OrderedTableRef[uint, PidInfo],
       cmd.add p.cmd
     else:
       cmd.add p.name
-    tb.write fgCyan, cmd.cut(tb.width - 67 - lvl - p.docker.len - 2, false,
+    tb.write fgCyan, cmd.cut(tb.width - 76 - lvl - p.docker.len - 2, false,
         tui.scrollX), fgColor
 
     inc y
@@ -390,7 +525,7 @@ proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
 
   let blogShort = extractFilename tui.blog
   tui.header(tb, info, stats.len, blogShort)
-  tui.graph(tb, stats, live, blogShort)
+  tui.graph(tb, stats, live, blogShort, info)
   let pidsInfo =
     if tui.group:
       info.pidsInfo.group(tui.kernel)
@@ -404,7 +539,7 @@ proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
     tui.help(tb, w, h, stats.len)
   tb.display()
 
-proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
+proc processKey(tui: Tui, key: Key, stats: var seq[StatV2], info: FullInfoRef) =
   if key == Key.None:
     tui.refresh = true
     return
@@ -433,6 +568,21 @@ proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
     of Key.I: tui.sort = Io; tui.draw = true
     of Key.N: tui.sort = Name; tui.draw = true
     of Key.C: tui.sort = Cpu; tui.draw = true
+    of Key.E:
+      let keys = activeNetKeys(info)
+      if tui.sort != Net:
+        tui.sort = Net
+        if keys.len > 0:
+          tui.netIf = keys[0]
+      else:
+        let idx = keys.find(tui.netIf)
+        if keys.len == 0:
+          discard
+        elif idx < 0 or idx >= keys.high:
+          tui.netIf = keys[0]
+        else:
+          tui.netIf = keys[idx + 1]
+      tui.draw = true
     of Key.T:
       tui.threads = not tui.threads
       if tui.threads: tui.group = false
@@ -443,6 +593,9 @@ proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
       tui.draw = true
     of Key.K:
       tui.kernel = not tui.kernel
+      tui.draw = true
+    of Key.A:
+      tui.autoScale = not tui.autoScale
       tui.draw = true
     of Key.L: tui.forceLive = not tui.forceLive; tui.reload = true
     of Key.Slash: tui.filter = some(""); tui.draw = true
@@ -464,6 +617,12 @@ proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
       if not tui.forceLive:
         (tui.blog, tui.hist) = moveBlog(+1, tui.blog, stats.len, stats.len)
       tui.reload = true
+    of Key.Plus:
+      if tui.graphHeight < 40: inc tui.graphHeight
+      tui.draw = true
+    of Key.Minus:
+      if tui.graphHeight > 4: dec tui.graphHeight
+      tui.draw = true
     else: discard
   else:
     case key
@@ -518,6 +677,8 @@ proc postProcess(tui: Tui, info: var FullInfoRef, stats, live: var seq[StatV2], 
   if tui.reload:
     if tui.hist == 0:
       tui.blog = moveBlog(+1, tui.blog, stats.len, stats.len)[0]
+    # On blog switch the cache is invalidated (blogCache.blog != blog),
+    # so hist() will rebuild it from the new file on cache miss.
     if tui.refresh:
       (info, stats, broken) = hist(tui.hist, tui.blog, live, tui.forceLive)
       tui.refresh = false
@@ -526,6 +687,24 @@ proc postProcess(tui: Tui, info: var FullInfoRef, stats, live: var seq[StatV2], 
     tui.reload = false
     tui.draw = true
     tui.broken = broken
+
+  # Accumulate per-interface network history for live mode.
+  # Each tick we append the current interface deltas, giving graphNet
+  # a proper time-series instead of repeating a single snapshot value.
+  if info != nil and info.net != nil:
+    for k, v in info.net:
+      if k.startsWith("veth"):
+        continue
+      if tui.liveNetHistory == nil:
+        tui.liveNetHistory = newOrderedTable[string, tuple[inData: seq[uint], outData: seq[uint]]]()
+      if k notin tui.liveNetHistory:
+        tui.liveNetHistory[k] = (newSeq[uint](), newSeq[uint]())
+      tui.liveNetHistory[k].inData.add(v.netInDiff)
+      tui.liveNetHistory[k].outData.add(v.netOutDiff)
+      # Bound each interface history to 1000 samples (matching the live seq[StatV2] buffer).
+      if tui.liveNetHistory[k].inData.len > 1000:
+        tui.liveNetHistory[k].inData.delete(0..0)
+        tui.liveNetHistory[k].outData.delete(0..0)
 
   if tui.draw:
     tui.redraw(info, stats, live)
@@ -569,6 +748,7 @@ when defined(debug):
 proc tui*() =
   init()
   illwillInit(fullscreen = true)
+  setDoubleBuffering(false)
   defer: stopTui()
   setControlCHook(exitProc)
   hideCursor()
@@ -576,7 +756,7 @@ proc tui*() =
   if getCfg().light:
     fgColor = fgLightColor
 
-  var tui = Tui(sort: Cpu)
+  var tui = Tui(sort: Cpu, graphHeight: 4, autoScale: true)
   (tui.blog, tui.hist) = moveBlog(0, tui.blog, tui.hist, 0)
   var live = newSeq[StatV2]()
   var (info, stats, broken) = hist(tui.hist, tui.blog, live, tui.forceLive)
@@ -584,7 +764,7 @@ proc tui*() =
   tui.redraw(info, stats, live)
 
   for key in keyEachTimeout(getCfg().refreshTimeout):
-    tui.processKey(key, stats)
+    tui.processKey(key, stats, info)
     if tui.quit:
       break
     tui.postProcess(info, stats, live, broken)

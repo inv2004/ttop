@@ -13,7 +13,7 @@ requires "nim >= 2.0.10"
 
 requires "https://github.com/inv2004/illwill"
 requires "zippy"
-requires "asciigraph"
+requires "https://github.com/kha84/asciigraph"
 requires "parsetoml"
 requires "https://github.com/inv2004/jsony#non_quoted_key"
 

@@ -19,7 +19,10 @@ Options:
   --on           enable system.timer (or cron) collector every 10 minutes
   --on <number>  enable system.timer (or cron) collector every <number> minutes
   --off          disable collector
+  -l <file>      display overall system load from specified .blog file
+  -p <file>      display detailed per-process data from specified .blog file
   -v, --version  version number (""" & NimblePkgVersion & """)
+
 
 """
 
@@ -49,6 +52,10 @@ proc main() =
     of 2:
       if paramStr(1) == "--on":
         onoff(true, parseUInt(paramStr(2)))
+      elif paramStr(1) == "-p":
+        printProcesses(paramStr(2))
+      elif paramStr(1) == "-l":
+        printSummary(paramStr(2))
       else:
         echo Help
         quit 1

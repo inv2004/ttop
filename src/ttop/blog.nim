@@ -108,16 +108,16 @@ proc hist*(ii: int, blog: string, live: var seq[StatV2], forceLive: bool): (Full
       if not forceLive and ii == result[1].len:
         new(result[0])
         result[0][] = infoFromGzip(buf)
+
+    if ii == -1:
+      if result[1].len > 0:
+        new(result[0])
+        result[0][] = infoFromGzip(buf)
+      else:
+        result[0] = fi
+
   except CatchableError:
     result[2] = true
-
-  if ii == -1:
-    if result[1].len > 0:
-      new(result[0])
-      result[0][] = infoFromGzip(buf)
-
-    else:
-      result[0] = fullInfo()
 
 proc histNoLive*(ii: int, blog: string): (FullInfoRef, seq[StatV2], bool) =
   var live = newSeq[StatV2]()
@@ -161,15 +161,17 @@ proc moveBlog*(d: int, b: string, hist, cnt: int): (string, int) =
 proc save*(): FullInfoRef =
   var lastBlog = moveBlog(0, "", 0, 0)[0]
   var (prev, _, broken) = histNoLive(-1, lastBlog)
-  if broken:
-    echo lastBlog, " is corrupted"
-  result = if prev == nil: fullInfo() else: fullInfo(prev)
+  result =
+    if broken or prev.isNil:
+      echo lastBlog, " is corrupted"
+      let cName = lastBlog & ".broken"
+      echo "moved to ", cName
+      moveFile lastBlog, cName
+      fullInfo()
+    else:
+      fullInfo(prev)
   let buf = compress(result[].toJson())
   let blog = saveBlog()
-  if broken and lastBlog == blog:
-    let cName = blog & ".broken"
-    echo "moved to ", cName
-    moveFile blog, cName
   let file = open(blog, fmAppend)
   defer: file.close()
   if flock(file.getFileHandle, 2 or 4) != 0:

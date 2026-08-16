@@ -379,29 +379,35 @@ proc redraw(tui: Tui, info: FullInfoRef, stats, live: seq[StatV2]) =
   let (w, h) = terminalSize()
   var tb = newTerminalBuffer(w, h)
 
+  if tui.broken:
+    tb.write fmt"blog is currupted {tui.blog}: {tui.hist} / {stats.len}"
+    tb.display()
+    return
   if info == nil:
     tb.write fmt"blog not found {tui.blog}: {tui.hist} / {stats.len}"
     tb.display()
     return
 
-  if checkAnyLimit(info):
+  if not tui.broken and checkAnyLimit(info):
     tb.setForegroundColor(fgRed, true)
     tb.drawRect(0, 0, w-1, h-1, true)
 
   let blogShort = extractFilename tui.blog
-  tui.header(tb, info, stats.len, blogShort)
+  if not tui.broken:
+    tui.header(tb, info, stats.len, blogShort)
   tui.graph(tb, stats, live, blogShort)
-  let pidsInfo =
-    if tui.group:
-      info.pidsInfo.group(tui.kernel)
+  if not tui.broken:
+    let pidsInfo =
+      if tui.group:
+        info.pidsInfo.group(tui.kernel)
+      else:
+        info.pidsInfo
+    pidsInfo.sort(tui.sort, tui.threads)
+    tui.table(tb, pidsInfo, stats.len)
+    if tui.filter.isSome:
+      tui.showFilter(tb, stats.len)
     else:
-      info.pidsInfo
-  pidsInfo.sort(tui.sort, tui.threads)
-  tui.table(tb, pidsInfo, stats.len)
-  if tui.filter.isSome:
-    tui.showFilter(tb, stats.len)
-  else:
-    tui.help(tb, w, h, stats.len)
+      tui.help(tb, w, h, stats.len)
   tb.display()
 
 proc processKey(tui: Tui, key: Key, stats: var seq[StatV2]) =
